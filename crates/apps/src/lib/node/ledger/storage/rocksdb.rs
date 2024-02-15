@@ -7,7 +7,6 @@
 //!   - `eth_events_queue`: a queue of confirmed ethereum events to be processed
 //!     in order
 //!   - `height`: the last committed block height
-//!   - `tx_queue`: txs to be decrypted in the next block
 //!   - `next_epoch_min_start_height`: minimum block height from which the next
 //!     epoch can start
 //!   - `next_epoch_min_start_time`: minimum block time from which the next
@@ -15,7 +14,6 @@
 //!   - `update_epoch_blocks_delay`: number of missing blocks before updating
 //!     PoS with CometBFT
 //!   - `pred`: predecessor values of the top-level keys of the same name
-//!     - `tx_queue`
 //!     - `next_epoch_min_start_height`
 //!     - `next_epoch_min_start_time`
 //!     - `update_epoch_blocks_delay`
@@ -517,7 +515,6 @@ impl RocksDB {
             "next_epoch_min_start_height",
             "next_epoch_min_start_time",
             "update_epoch_blocks_delay",
-            "tx_queue",
         ] {
             let previous_key = format!("pred/{}", metadata_key);
             let previous_value = self
@@ -1010,15 +1007,6 @@ impl DB for RocksDB {
             );
         }
 
-        // Tx queue
-        if let Some(pred_tx_queue) = self
-            .0
-            .get_cf(state_cf, "tx_queue")
-            .map_err(|e| Error::DBError(e.into_string()))?
-        {
-            // Write the predecessor value for rollback
-            batch.0.put_cf(state_cf, "pred/tx_queue", pred_tx_queue);
-        }
         batch
             .0
             .put_cf(state_cf, "ethereum_height", encode(&ethereum_height));
@@ -2361,10 +2349,9 @@ mod test {
         for tx in [b"tx1", b"tx2", b"tx3", b"tx5", b"tx6"] {
             assert!(db.has_replay_protection_entry(&Hash::sha256(tx)).unwrap());
         }
-        assert!(
-            !db.has_replay_protection_entry(&Hash::sha256(b"tx4"))
-                .unwrap()
-        );
+        assert!(!db
+            .has_replay_protection_entry(&Hash::sha256(b"tx4"))
+            .unwrap());
 
         // Rollback to the first block height
         db.rollback(height_0).unwrap();
@@ -2388,9 +2375,9 @@ mod test {
         }
 
         for tx in [b"tx5", b"tx6"] {
-            assert!(
-                !db.has_replay_protection_entry(&Hash::sha256(tx)).unwrap()
-            );
+            assert!(!db
+                .has_replay_protection_entry(&Hash::sha256(tx))
+                .unwrap());
         }
     }
 

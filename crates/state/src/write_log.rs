@@ -619,12 +619,12 @@ impl WriteLog {
             Some(_) =>
             // Cannot delete an hash that still has to be written to
             // storage or has already been deleted
-            {
-                Err(Error::ReplayProtection(format!(
-                    "Requested a delete on hash {hash} not yet committed to \
+                {
+                    Err(Error::ReplayProtection(format!(
+                        "Requested a delete on hash {hash} not yet committed to \
                      storage"
-                )))
-            }
+                    )))
+                }
         }
     }
 
