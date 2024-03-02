@@ -56,7 +56,6 @@ use namada::core::time::DateTimeUtc;
 use namada::core::{decode, encode, ethereum_events, ethereum_structs};
 use namada::eth_bridge::storage::proof::BridgePoolRootProof;
 use namada::ledger::eth_bridge::storage::bridge_pool;
-use namada::ledger::storage::tx_queue::TxQueue;
 use namada::replay_protection;
 use namada::state::merkle_tree::{base_tree_key_prefix, subtree_key_prefix};
 use namada::state::{
