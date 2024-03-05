@@ -785,10 +785,15 @@ pub async fn submit_become_validator(
             if resp.is_applied_and_valid().is_some() {
                 // add validator address and keys to the wallet
                 let mut wallet = namada.wallet_mut().await;
-                wallet.add_validator_data(address.clone(), validator_keys);
-                wallet.save().unwrap_or_else(|err| {
-                    edisplay_line!(namada.io(), "{}", err)
-                });
+                // wallet.add_validator_data(address.clone(), validator_keys);
+                wallet
+                    .add_validator_data_atomic(address.clone(), validator_keys)
+                    .unwrap_or_else(|err| {
+                        edisplay_line!(namada.io(), "{}", err)
+                    });
+                // wallet.save().unwrap_or_else(|err| {
+                //     edisplay_line!(namada.io(), "{}", err)
+                // });
 
                 let tendermint_home = config.ledger.cometbft_dir();
                 tendermint_node::write_validator_key(
