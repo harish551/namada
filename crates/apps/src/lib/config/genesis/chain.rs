@@ -139,7 +139,7 @@ impl Finalized {
                     AddressVpType::Token,
                     config.address.clone(),
                 )
-                .expect("Failed to update the wallet store.");
+                .expect("Failed to update the wallet storage.");
         }
         if let Some(pre_genesis_wallet) = pre_genesis_wallet {
             wallet.extend(pre_genesis_wallet);
