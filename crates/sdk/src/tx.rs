@@ -2572,7 +2572,11 @@ async fn construct_shielded_parts<N: Namada>(
     amount: token::DenominatedAmount,
 ) -> Result<Option<(ShieldedTransfer, HashSet<AssetData>)>> {
     // Precompute asset types to increase chances of success in decoding
-    let token_map = context.wallet().await.get_addresses();
+    let token_map = context
+        .wallet()
+        .await
+        .get_addresses_atomic()
+        .expect("Failed to read from the wallet storage.");
     let tokens = token_map.values().collect();
     let _ = context
         .shielded_mut()
@@ -2862,7 +2866,11 @@ pub async fn gen_ibc_shielded_transfer<N: Namada>(
         validate_amount(context, args.amount, &token, false).await?;
 
     // Precompute asset types to increase chances of success in decoding
-    let token_map = context.wallet().await.get_addresses();
+    let token_map = context
+        .wallet()
+        .await
+        .get_addresses_atomic()
+        .expect("Failed to read from the wallet storage.");
     let tokens = token_map.values().collect();
     let _ = context
         .shielded_mut()
