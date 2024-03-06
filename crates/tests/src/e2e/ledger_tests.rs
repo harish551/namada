@@ -990,7 +990,8 @@ fn pos_bonds() -> Result<()> {
             genesis.transactions.bond = Some({
                 let wallet = get_pregenesis_wallet(base_dir);
                 let validator_1_address = wallet
-                    .find_address("validator-1")
+                    .find_address_atomic("validator-1")
+                    .expect("Failed to read from the wallet storage.")
                     .expect("Failed to find validator-1 address");
                 let mut bonds = genesis.transactions.bond.unwrap();
                 bonds
@@ -3283,7 +3284,8 @@ fn deactivate_and_reactivate_validator() -> Result<()> {
             genesis.transactions.bond = Some({
                 let wallet = get_pregenesis_wallet(base_dir);
                 let validator_1_address = wallet
-                    .find_address("validator-1")
+                    .find_address_atomic("validator-1")
+                    .expect("Failed to read from the wallet storage.")
                     .expect("Failed to find validator-1 address");
                 let mut bonds = genesis.transactions.bond.unwrap();
                 bonds
@@ -3547,7 +3549,8 @@ fn test_invalid_validator_txs() -> Result<()> {
             genesis.transactions.bond = Some({
                 let wallet = get_pregenesis_wallet(base_dir);
                 let validator_1_address = wallet
-                    .find_address("validator-1")
+                    .find_address_atomic("validator-1")
+                    .expect("Failed to read from the wallet storage.")
                     .expect("Failed to find validator-1 address");
                 let mut bonds = genesis.transactions.bond.unwrap();
                 bonds
