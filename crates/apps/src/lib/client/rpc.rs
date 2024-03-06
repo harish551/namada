@@ -662,7 +662,9 @@ async fn print_balances(
                 format!(
                     ": {}, owned by {}",
                     context.format_amount(tok, balance).await,
-                    wallet.lookup_alias(owner)
+                    wallet
+                        .lookup_alias_atomic(owner)
+                        .expect("Failed to read from the wallet storage.")
                 ),
             ),
             None => continue,
@@ -706,11 +708,13 @@ async fn print_balances(
                 context.io(),
                 &mut w;
                 "No balances owned by {}",
-                wallet.lookup_alias(target)
+                wallet.lookup_alias_atomic(target).expect("Failed to read from the wallet storage.")
             )
             .unwrap(),
             (Some(token), None) => {
-                let token_alias = wallet.lookup_alias(token);
+                let token_alias = wallet
+                    .lookup_alias_atomic(token)
+                    .expect("Failed to read from the wallet storage.");
                 display_line!(context.io(), &mut w; "No balances for token {}", token_alias).unwrap()
             }
             (None, None) => {
@@ -735,7 +739,11 @@ async fn lookup_token_alias(
             Err(_) => token.to_string(),
         }
     } else {
-        context.wallet().await.lookup_alias(token)
+        context
+            .wallet()
+            .await
+            .lookup_alias_atomic(token)
+            .expect("Failed to read from the wallet storage.")
     }
 }
 
@@ -751,14 +759,17 @@ async fn query_tokens(
     let mut tokens = match base_token {
         Some(base_token) => {
             let mut map = BTreeMap::new();
-            if let Some(alias) = wallet.find_alias(base_token) {
+            if let Some(alias) = wallet
+                .find_alias_atomic(base_token)
+                .expect("Failed to read from the wallet storage.")
+            {
                 map.insert(alias.to_string(), base_token.clone());
             }
             map
         }
         None => wallet
-            .tokens_with_aliases()
-            .expect("Failed to read tokens from the wallet store."),
+            .tokens_with_aliases_atomic()
+            .expect("Failed to read from the wallet storage."),
     };
 
     // Check all IBC denoms if the token isn't an pre-existing token
@@ -809,7 +820,9 @@ async fn get_ibc_denom_alias(
     is_ibc_denom(&ibc_denom)
         .map(|(trace_path, base_token)| {
             let base_token_alias = match Address::decode(&base_token) {
-                Ok(base_token) => wallet.lookup_alias(&base_token),
+                Ok(base_token) => wallet
+                    .lookup_alias_atomic(&base_token)
+                    .expect("Failed to read from the wallet storage."),
                 Err(_) => base_token,
             };
             if trace_path.is_empty() {
