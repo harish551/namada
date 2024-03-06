@@ -517,31 +517,31 @@ impl<U> Wallet<U> {
     //         })
     // }
 
+    // /// Find an alias by the address if it's in the wallet.
+    // pub fn find_alias(&self, address: &Address) -> Option<&Alias> {
+    //     self.store.find_alias(address)
+    // }
+
+    // /// Try to find an alias for a given address from the wallet. If not
+    // found, /// formats the address into a string.
+    // pub fn lookup_alias(&self, addr: &Address) -> String {
+    //     match self.find_alias(addr) {
+    //         Some(alias) => format!("{}", alias),
+    //         None => format!("{}", addr),
+    //     }
+    // }
+
+    // /// Find the viewing key with the given alias in the wallet and return it
+    // pub fn find_viewing_key(
+    //     &self,
+    //     alias: impl AsRef<str>,
+    // ) -> Result<&ExtendedViewingKey, FindKeyError> {
+    //     self.store.find_viewing_key(alias.as_ref()).ok_or_else(|| {
+    //         FindKeyError::KeyNotFound(alias.as_ref().to_string())
+    //     })
+    // }
+
     /// XXX HERE
-    /// Find an alias by the address if it's in the wallet.
-    pub fn find_alias(&self, address: &Address) -> Option<&Alias> {
-        self.store.find_alias(address)
-    }
-
-    /// Try to find an alias for a given address from the wallet. If not found,
-    /// formats the address into a string.
-    pub fn lookup_alias(&self, addr: &Address) -> String {
-        match self.find_alias(addr) {
-            Some(alias) => format!("{}", alias),
-            None => format!("{}", addr),
-        }
-    }
-
-    /// Find the viewing key with the given alias in the wallet and return it
-    pub fn find_viewing_key(
-        &self,
-        alias: impl AsRef<str>,
-    ) -> Result<&ExtendedViewingKey, FindKeyError> {
-        self.store.find_viewing_key(alias.as_ref()).ok_or_else(|| {
-            FindKeyError::KeyNotFound(alias.as_ref().to_string())
-        })
-    }
-
     /// Find the payment address with the given alias in the wallet and return
     /// it
     pub fn find_payment_addr(
@@ -779,6 +779,21 @@ impl<U: WalletStorage> Wallet<U> {
             Some(alias) => format!("{}", alias),
             None => format!("{}", addr),
         })
+    }
+
+    /// Find the viewing key with the given alias in the wallet and return it
+    pub fn find_viewing_key_atomic(
+        &self,
+        alias: impl AsRef<str>,
+    ) -> Result<Result<ExtendedViewingKey, FindKeyError>, LoadStoreError> {
+        Ok(self
+            .utils
+            .load_store_read_only()?
+            .find_viewing_key(alias.as_ref())
+            .cloned()
+            .ok_or_else(|| {
+                FindKeyError::KeyNotFound(alias.as_ref().to_string())
+            }))
     }
 }
 
