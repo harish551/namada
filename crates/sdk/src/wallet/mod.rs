@@ -83,7 +83,7 @@ pub trait WalletIo: Sized + Clone {
 }
 
 /// Errors of wallet loading and storing
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum LoadStoreError {
     /// Wallet store decoding error
     #[error("Failed decoding the wallet store: {0}")]
