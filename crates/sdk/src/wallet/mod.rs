@@ -569,16 +569,16 @@ impl<U> Wallet<U> {
     // > (alias.into(), value)) .collect()
     // }
 
-    /// XXX HERE
-    /// Get all known public keys by their alias.
-    pub fn get_public_keys(&self) -> HashMap<String, common::PublicKey> {
-        self.store
-            .get_public_keys()
-            .iter()
-            .map(|(alias, value)| (alias.into(), value.clone()))
-            .collect()
-    }
+    // /// Get all known public keys by their alias.
+    // pub fn get_public_keys(&self) -> HashMap<String, common::PublicKey> {
+    //     self.store
+    //         .get_public_keys()
+    //         .iter()
+    //         .map(|(alias, value)| (alias.into(), value.clone()))
+    //         .collect()
+    // }
 
+    /// XXX HERE
     /// Get all known addresses by their alias, paired with PKH, if known.
     pub fn get_addresses(&self) -> HashMap<String, Address> {
         self.store
@@ -837,6 +837,19 @@ impl<U: WalletStorage> Wallet<U> {
             .map(|(alias, (kp, pkh))| {
                 (alias.into(), (kp.clone(), pkh.cloned()))
             })
+            .collect())
+    }
+
+    /// Get all known public keys by their alias.
+    pub fn get_public_keys_atomic(
+        &self,
+    ) -> Result<HashMap<String, common::PublicKey>, LoadStoreError> {
+        Ok(self
+            .utils
+            .load_store_read_only()?
+            .get_public_keys()
+            .iter()
+            .map(|(alias, value)| (alias.into(), value.clone()))
             .collect())
     }
 }
