@@ -804,9 +804,12 @@ pub async fn submit_become_validator(
                 let tendermint_home = config.ledger.cometbft_dir();
                 tendermint_node::write_validator_key(
                     &tendermint_home,
-                    &wallet.find_key_by_pk(&consensus_key, None).expect(
-                        "unable to find consensus key pair in the wallet",
-                    ),
+                    &wallet
+                        .find_key_by_pk_atomic(&consensus_key, None)
+                        .expect("Failed to read from the wallet storage.")
+                        .expect(
+                            "Unable to find consensus key pair in the wallet.",
+                        ),
                 )
                 .unwrap();
                 // To avoid wallet deadlocks in following operations
@@ -1059,7 +1062,11 @@ where
             args.tx
                 .signing_keys
                 .iter()
-                .map(|pk| wallet.find_key_by_pk(pk, None))
+                .map(|pk| {
+                    wallet
+                        .find_key_by_pk_atomic(pk, None)
+                        .expect("Failed to read from the wallet storage.")
+                })
                 .collect::<Result<_, _>>()
                 .expect("secret keys corresponding to public keys not found"),
             &signing_data.account_public_keys_map.unwrap(),
@@ -1218,7 +1225,11 @@ where
             args.tx
                 .signing_keys
                 .iter()
-                .map(|pk| wallet.find_key_by_pk(pk, None))
+                .map(|pk| {
+                    wallet
+                        .find_key_by_pk_atomic(pk, None)
+                        .expect("Failed to read from the wallet storage.")
+                })
                 .collect::<Result<_, _>>()
                 .expect("secret keys corresponding to public keys not found"),
             &signing_data.account_public_keys_map.unwrap(),
