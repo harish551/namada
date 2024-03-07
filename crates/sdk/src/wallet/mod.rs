@@ -616,15 +616,15 @@ impl<U> Wallet<U> {
     // }
 
     /// XXX HERE
-    /// Check if alias is an encrypted secret key
-    pub fn is_encrypted_secret_key(
-        &self,
-        alias: impl AsRef<str>,
-    ) -> Option<bool> {
-        self.store
-            .find_secret_key(alias)
-            .map(|stored_keypair| stored_keypair.is_encrypted())
-    }
+    // /// Check if alias is an encrypted secret key
+    // pub fn is_encrypted_secret_key(
+    //     &self,
+    //     alias: impl AsRef<str>,
+    // ) -> Option<bool> {
+    //     self.store
+    //         .find_secret_key(alias)
+    //         .map(|stored_keypair| stored_keypair.is_encrypted())
+    // }
 
     /// Check if alias is an encrypted spending key
     pub fn is_encrypted_spending_key(
@@ -907,6 +907,17 @@ impl<U: WalletStorage> Wallet<U> {
             .collect())
     }
 
+    /// Check if alias is an encrypted secret key
+    pub fn is_encrypted_secret_key_atomic(
+        &self,
+        alias: impl AsRef<str>,
+    ) -> Result<Option<bool>, LoadStoreError> {
+        Ok(self
+            .utils
+            .load_store_read_only()?
+            .find_secret_key(alias)
+            .map(|stored_keypair| stored_keypair.is_encrypted()))
+    }
 }
 
 impl<U: WalletIo> Wallet<U> {
