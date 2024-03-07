@@ -2335,7 +2335,8 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
         let vks: Vec<_> = context
             .wallet()
             .await
-            .get_viewing_keys()
+            .get_viewing_keys_atomic()
+            .expect("Failed to read from the wallet storage.")
             .values()
             .map(|evk| ExtendedFullViewingKey::from(*evk).fvk.vk)
             .collect();
