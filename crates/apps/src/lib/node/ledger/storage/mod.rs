@@ -89,7 +89,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -142,7 +141,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -203,7 +201,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -226,7 +223,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -271,7 +267,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -344,7 +339,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -440,7 +434,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -565,7 +558,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             Some(5),
             is_merklized_storage_key,
         );
@@ -688,7 +680,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             is_merklized_storage_key,
         );
@@ -800,7 +791,6 @@ mod tests {
             None,
             ChainId::default(),
             address::testing::nam(),
-            false,
             None,
             merkle_tree_key_filter,
         );
