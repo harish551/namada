@@ -344,7 +344,8 @@ pub async fn aux_signing_data(
         context
             .wallet_mut()
             .await
-            .gen_disposable_signing_key(&mut OsRng)
+            .gen_disposable_signing_key_atomic(&mut OsRng)
+            .expect("Failed to update the wallet store.")
             .to_public()
     } else {
         match &args.wrapper_fee_payer {
@@ -384,7 +385,8 @@ pub async fn init_validator_signing_data(
         context
             .wallet_mut()
             .await
-            .gen_disposable_signing_key(&mut OsRng)
+            .gen_disposable_signing_key_atomic(&mut OsRng)
+            .expect("Failed to update the wallet store.")
             .to_public()
     } else {
         match &args.wrapper_fee_payer {
