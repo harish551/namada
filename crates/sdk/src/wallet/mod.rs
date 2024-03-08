@@ -17,7 +17,6 @@ use namada_core::key::*;
 use namada_core::masp::{
     ExtendedSpendingKey, ExtendedViewingKey, PaymentAddress,
 };
-use partial_application::partial;
 pub use pre_genesis::gen_key_to_store;
 use rand::CryptoRng;
 use rand_core::RngCore;
@@ -419,11 +418,9 @@ impl<U: WalletStorage> Wallet<U> {
         address: Address,
         keys: ValidatorKeys,
     ) -> Result<(), LoadStoreError> {
-        self.utils.clone().update_store(
-            partial!(Store::add_validator_data => _,
-                address,
-                keys),
-        )
+        self.utils
+            .clone()
+            .update_store(|store| store.add_validator_data(address, keys))
     }
 
     /// XXX does not make sense in the current context -- REMOVE?
@@ -451,13 +448,13 @@ impl<U: WalletStorage> Wallet<U> {
         validator_alias: Alias,
         other: pre_genesis::ValidatorWallet,
     ) -> Result<(), LoadStoreError> {
-        self.utils.clone().update_store(
-            partial!(Store::extend_from_pre_genesis_validator => _,
+        self.utils.clone().update_store(|store| {
+            store.extend_from_pre_genesis_validator(
                 validator_address,
                 validator_alias,
-                other
-            ),
-        )
+                other,
+            )
+        })
     }
 
     /// Gets all addresses given a vp_type
@@ -477,9 +474,9 @@ impl<U: WalletStorage> Wallet<U> {
         vp_type: AddressVpType,
         address: Address,
     ) -> Result<(), LoadStoreError> {
-        self.utils.clone().update_store(
-            partial!(Store::add_vp_type_to_address => _, vp_type, address),
-        )
+        self.utils.clone().update_store(|store| {
+            store.add_vp_type_to_address(vp_type, address)
+        })
     }
 
     /// Get addresses with tokens VP type keyed and ordered by their aliases.
