@@ -2410,8 +2410,7 @@ mod test_finalize_block {
             .shell
             .state
             .write_log()
-            .has_replay_protection_entry(&wrapper_tx.raw_header_hash())
-            .unwrap_or_default());
+            .has_replay_protection_entry(&wrapper_tx.raw_header_hash()));
         // Check that the hash is present in the merkle tree
         assert!(!shell
             .shell
@@ -2505,13 +2504,11 @@ mod test_finalize_block {
             assert!(shell
                 .state
                 .write_log()
-                .has_replay_protection_entry(&wrapper.raw_header_hash())
-                .unwrap_or_default());
+                .has_replay_protection_entry(&wrapper.raw_header_hash()));
             assert!(!shell
                 .state
                 .write_log()
-                .has_replay_protection_entry(&wrapper.header_hash())
-                .unwrap_or_default());
+                .has_replay_protection_entry(&wrapper.header_hash()));
         }
     }
 
@@ -2617,26 +2614,6 @@ mod test_finalize_block {
 
         // This hash must be present as succesfully added by the second
         // transaction
-        assert!(shell
-            .state
-            .write_log()
-            .has_replay_protection_entry(&wrapper.raw_header_hash())
-            .unwrap_or_default());
-        assert!(shell
-            .state
-            .write_log()
-            .has_replay_protection_entry(&wrapper.header_hash())
-            .unwrap_or_default());
-        assert!(shell
-            .state
-            .write_log()
-            .has_replay_protection_entry(&new_wrapper.raw_header_hash())
-            .unwrap_or_default());
-        assert!(!shell
-            .state
-            .write_log()
-            .has_replay_protection_entry(&new_wrapper.header_hash())
-            .unwrap_or_default());
     }
 
     /// Test that if a transaction fails because of out-of-gas,
@@ -2792,24 +2769,20 @@ mod test_finalize_block {
             assert!(!shell
                 .state
                 .write_log()
-                .has_replay_protection_entry(&valid_wrapper.raw_header_hash())
-                .unwrap_or_default());
+                .has_replay_protection_entry(&valid_wrapper.raw_header_hash()));
             assert!(shell
                 .state
                 .write_log()
-                .has_replay_protection_entry(&valid_wrapper.header_hash())
-                .unwrap_or_default());
+                .has_replay_protection_entry(&valid_wrapper.header_hash()));
         }
         assert!(shell
             .state
             .write_log()
-            .has_replay_protection_entry(&failing_wrapper.raw_header_hash())
-            .expect("test failed"));
+            .has_replay_protection_entry(&failing_wrapper.raw_header_hash()));
         assert!(!shell
             .state
             .write_log()
-            .has_replay_protection_entry(&failing_wrapper.header_hash())
-            .unwrap_or_default());
+            .has_replay_protection_entry(&failing_wrapper.header_hash()));
     }
 
     #[test]
@@ -2878,13 +2851,11 @@ mod test_finalize_block {
         assert!(shell
             .state
             .write_log()
-            .has_replay_protection_entry(&wrapper_hash)
-            .unwrap_or_default());
+            .has_replay_protection_entry(&wrapper_hash));
         assert!(!shell
             .state
             .write_log()
-            .has_replay_protection_entry(&wrapper.raw_header_hash())
-            .unwrap_or_default());
+            .has_replay_protection_entry(&wrapper.raw_header_hash()));
     }
 
     // Test that the fees are paid even if the inner transaction fails and its
