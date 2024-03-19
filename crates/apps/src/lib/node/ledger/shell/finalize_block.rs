@@ -82,16 +82,6 @@ where
             self.state.in_mem().update_epoch_blocks_delay
         );
 
-        // Finalize the transactions' hashes from the previous block. Also cache
-        // "last" hashes from the previous block in case of a rollback
-        let (write_log, _in_mem, db) = self.state.split_borrow();
-        for (raw_key, _, _) in db.iter_replay_protection() {
-            let hash = raw_key.parse().expect("Failed hash conversion");
-            write_log
-                .finalize_tx_hash(hash)
-                .expect("Failed tx hashes finalization")
-        }
-
         let emit_events = &mut response.events;
         // Get the actual votes from cometBFT in the preferred format
         let votes = pos_votes_from_abci(&self.state, &req.votes);
@@ -2415,25 +2405,21 @@ mod test_finalize_block {
         assert_eq!(root_pre.0, root_post.0);
 
         // Check transaction's hash in storage
-        assert!(
-            shell
-                .shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&wrapper_tx.raw_header_hash())
-                .unwrap_or_default()
-        );
+        assert!(shell
+            .shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&wrapper_tx.raw_header_hash())
+            .unwrap_or_default());
         // Check that the hash is present in the merkle tree
-        assert!(
-            !shell
-                .shell
-                .state
-                .in_mem()
-                .block
-                .tree
-                .has_key(&wrapper_hash_key)
-                .unwrap()
-        );
+        assert!(!shell
+            .shell
+            .state
+            .in_mem()
+            .block
+            .tree
+            .has_key(&wrapper_hash_key)
+            .unwrap());
     }
 
     /// Test that a tx that has already been applied in the same block
@@ -2515,20 +2501,16 @@ mod test_finalize_block {
         assert_eq!(code, String::from(ResultCode::WasmRuntimeError).as_str());
 
         for wrapper in [&wrapper, &new_wrapper] {
-            assert!(
-                shell
-                    .state
-                    .write_log()
-                    .has_replay_protection_entry(&wrapper.raw_header_hash())
-                    .unwrap_or_default()
-            );
-            assert!(
-                !shell
-                    .state
-                    .write_log()
-                    .has_replay_protection_entry(&wrapper.header_hash())
-                    .unwrap_or_default()
-            );
+            assert!(shell
+                .state
+                .write_log()
+                .has_replay_protection_entry(&wrapper.raw_header_hash())
+                .unwrap_or_default());
+            assert!(!shell
+                .state
+                .write_log()
+                .has_replay_protection_entry(&wrapper.header_hash())
+                .unwrap_or_default());
         }
     }
 
@@ -2634,34 +2616,26 @@ mod test_finalize_block {
 
         // This hash must be present as succesfully added by the second
         // transaction
-        assert!(
-            shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&wrapper.raw_header_hash())
-                .unwrap_or_default()
-        );
-        assert!(
-            shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&wrapper.header_hash())
-                .unwrap_or_default()
-        );
-        assert!(
-            shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&new_wrapper.raw_header_hash())
-                .unwrap_or_default()
-        );
-        assert!(
-            !shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&new_wrapper.header_hash())
-                .unwrap_or_default()
-        );
+        assert!(shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&wrapper.raw_header_hash())
+            .unwrap_or_default());
+        assert!(shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&wrapper.header_hash())
+            .unwrap_or_default());
+        assert!(shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&new_wrapper.raw_header_hash())
+            .unwrap_or_default());
+        assert!(!shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&new_wrapper.header_hash())
+            .unwrap_or_default());
     }
 
     /// Test that if a transaction fails because of out-of-gas,
@@ -2814,37 +2788,27 @@ mod test_finalize_block {
             unsigned_wrapper,
             wrong_commitment_wrapper,
         ] {
-            assert!(
-                !shell
-                    .state
-                    .write_log()
-                    .has_replay_protection_entry(
-                        &valid_wrapper.raw_header_hash()
-                    )
-                    .unwrap_or_default()
-            );
-            assert!(
-                shell
-                    .state
-                    .write_log()
-                    .has_replay_protection_entry(&valid_wrapper.header_hash())
-                    .unwrap_or_default()
-            );
+            assert!(!shell
+                .state
+                .write_log()
+                .has_replay_protection_entry(&valid_wrapper.raw_header_hash())
+                .unwrap_or_default());
+            assert!(shell
+                .state
+                .write_log()
+                .has_replay_protection_entry(&valid_wrapper.header_hash())
+                .unwrap_or_default());
         }
-        assert!(
-            shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&failing_wrapper.raw_header_hash())
-                .expect("test failed")
-        );
-        assert!(
-            !shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&failing_wrapper.header_hash())
-                .unwrap_or_default()
-        );
+        assert!(shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&failing_wrapper.raw_header_hash())
+            .expect("test failed"));
+        assert!(!shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&failing_wrapper.header_hash())
+            .unwrap_or_default());
     }
 
     #[test]
@@ -2910,20 +2874,16 @@ mod test_finalize_block {
             .as_str();
         assert_eq!(code, String::from(ResultCode::InvalidTx).as_str());
 
-        assert!(
-            shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&wrapper_hash)
-                .unwrap_or_default()
-        );
-        assert!(
-            !shell
-                .state
-                .write_log()
-                .has_replay_protection_entry(&wrapper.raw_header_hash())
-                .unwrap_or_default()
-        );
+        assert!(shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&wrapper_hash)
+            .unwrap_or_default());
+        assert!(!shell
+            .state
+            .write_log()
+            .has_replay_protection_entry(&wrapper.raw_header_hash())
+            .unwrap_or_default());
     }
 
     // Test that the fees are paid even if the inner transaction fails and its
@@ -3316,11 +3276,9 @@ mod test_finalize_block {
                 .unwrap(),
             Some(ValidatorState::Consensus)
         );
-        assert!(
-            enqueued_slashes_handle()
-                .at(&Epoch::default())
-                .is_empty(&shell.state)?
-        );
+        assert!(enqueued_slashes_handle()
+            .at(&Epoch::default())
+            .is_empty(&shell.state)?);
         assert_eq!(
             get_num_consensus_validators(&shell.state, Epoch::default())
                 .unwrap(),
@@ -3339,21 +3297,17 @@ mod test_finalize_block {
                     .unwrap(),
                 Some(ValidatorState::Jailed)
             );
-            assert!(
-                enqueued_slashes_handle()
-                    .at(&epoch)
-                    .is_empty(&shell.state)?
-            );
+            assert!(enqueued_slashes_handle()
+                .at(&epoch)
+                .is_empty(&shell.state)?);
             assert_eq!(
                 get_num_consensus_validators(&shell.state, epoch).unwrap(),
                 5_u64
             );
         }
-        assert!(
-            !enqueued_slashes_handle()
-                .at(&processing_epoch)
-                .is_empty(&shell.state)?
-        );
+        assert!(!enqueued_slashes_handle()
+            .at(&processing_epoch)
+            .is_empty(&shell.state)?);
 
         // Advance to the processing epoch
         loop {
@@ -3376,11 +3330,9 @@ mod test_finalize_block {
                 // println!("Reached processing epoch");
                 break;
             } else {
-                assert!(
-                    enqueued_slashes_handle()
-                        .at(&shell.state.in_mem().block.epoch)
-                        .is_empty(&shell.state)?
-                );
+                assert!(enqueued_slashes_handle()
+                    .at(&shell.state.in_mem().block.epoch)
+                    .is_empty(&shell.state)?);
                 let stake1 = read_validator_stake(
                     &shell.state,
                     &params,
@@ -3867,13 +3819,11 @@ mod test_finalize_block {
             )
             .unwrap();
         assert_eq!(last_slash, Some(misbehavior_epoch));
-        assert!(
-            namada_proof_of_stake::storage::validator_slashes_handle(
-                &val1.address
-            )
-            .is_empty(&shell.state)
-            .unwrap()
-        );
+        assert!(namada_proof_of_stake::storage::validator_slashes_handle(
+            &val1.address
+        )
+        .is_empty(&shell.state)
+        .unwrap());
 
         tracing::debug!("Advancing to epoch 7");
 
@@ -3933,22 +3883,18 @@ mod test_finalize_block {
             )
             .unwrap();
         assert_eq!(last_slash, Some(Epoch(4)));
-        assert!(
-            namada_proof_of_stake::is_validator_frozen(
-                &shell.state,
-                &val1.address,
-                current_epoch,
-                &params
-            )
-            .unwrap()
-        );
-        assert!(
-            namada_proof_of_stake::storage::validator_slashes_handle(
-                &val1.address
-            )
-            .is_empty(&shell.state)
-            .unwrap()
-        );
+        assert!(namada_proof_of_stake::is_validator_frozen(
+            &shell.state,
+            &val1.address,
+            current_epoch,
+            &params
+        )
+        .unwrap());
+        assert!(namada_proof_of_stake::storage::validator_slashes_handle(
+            &val1.address
+        )
+        .is_empty(&shell.state)
+        .unwrap());
 
         let pre_stake_10 =
             namada_proof_of_stake::storage::read_validator_stake(
