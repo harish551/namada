@@ -4,12 +4,11 @@ use data_encoding::HEXUPPER;
 use masp_primitives::merkle_tree::CommitmentTree;
 use masp_primitives::sapling::Node;
 use namada::core::storage::{BlockHash, BlockResults, Epoch, Header};
-use namada::gas::event::WithGasUsed;
+use namada::gas::event::GasUsed;
 use namada::governance::pgf::inflation as pgf_inflation;
 use namada::ledger::events::extend::{
     ComposeEvent, Height, Info, Log, ValidMaspTx,
 };
-use namada::ledger::events::{EmitEvents, EventType};
 use namada::ledger::gas::GasMetering;
 use namada::ledger::pos::namada_proof_of_stake;
 use namada::ledger::protocol::WrapperArgs;
@@ -17,9 +16,11 @@ use namada::proof_of_stake;
 use namada::proof_of_stake::storage::{
     find_validator_by_raw_hash, write_last_block_proposer_address,
 };
+use namada::sdk::events::EmitEvents;
 use namada::state::write_log::StorageModification;
 use namada::state::{ResultExt, StorageWrite, EPOCH_SWITCH_BLOCKS_DELAY};
 use namada::tx::data::protocol::ProtocolTxType;
+use namada::tx::event::types::ACCEPTED as ACCEPTED_TX;
 use namada::tx::event::{Code, InnerTx};
 use namada::tx::new_tx_event;
 use namada::vote_ext::ethereum_events::MultiSignedEthEvent;
@@ -189,7 +190,7 @@ where
                             "Tx rejected: {}",
                             &processed_tx.result.info
                         )))
-                        .with(WithGasUsed(0.into())),
+                        .with(GasUsed(0.into())),
                 );
                 continue;
             }
@@ -212,7 +213,7 @@ where
                             "Tx rejected: {}",
                             &processed_tx.result.info
                         )))
-                        .with(WithGasUsed(0.into())),
+                        .with(GasUsed(0.into())),
                 );
                 // if the rejected tx was decrypted, remove it
                 // from the queue of txs to be processed
@@ -394,7 +395,7 @@ where
             match tx_result {
                 Ok(result) => {
                     if result.is_accepted() {
-                        if let EventType::Accepted = tx_event.event_type {
+                        if tx_event.event_type == ACCEPTED_TX {
                             // Wrapper transaction
                             tracing::trace!(
                                 "Wrapper transaction {} was accepted",
@@ -480,7 +481,7 @@ where
                         tx_event.extend(Code(ResultCode::InvalidTx));
                     }
                     tx_event
-                        .extend(WithGasUsed(result.gas_used))
+                        .extend(GasUsed(result.gas_used))
                         .extend(Info("Check inner_tx for result.".to_string()))
                         .extend(InnerTx(&result));
                 }
@@ -526,10 +527,10 @@ where
                     self.state.drop_tx();
 
                     tx_event
-                        .extend(WithGasUsed(tx_gas_meter.get_tx_consumed_gas()))
+                        .extend(GasUsed(tx_gas_meter.get_tx_consumed_gas()))
                         .extend(Info(msg.to_string()));
 
-                    if let EventType::Accepted = tx_event.event_type {
+                    if tx_event.event_type == ACCEPTED_TX {
                         // If wrapper, invalid tx error code
                         tx_event.extend(Code(ResultCode::InvalidTx));
                         // The fee unshield operation could still have been

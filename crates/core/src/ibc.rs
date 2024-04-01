@@ -1,7 +1,7 @@
 //! IBC-related data types
 
-use std::cmp::Ordering;
-use std::collections::HashMap;
+pub mod event;
+
 use std::str::FromStr;
 
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
@@ -14,15 +14,13 @@ use namada_migrations::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub use self::event::IbcEvent;
 use super::address::HASH_LEN;
 use crate::ibc::apps::transfer::types::msgs::transfer::MsgTransfer;
 use crate::ibc::apps::transfer::types::{Memo, PrefixedDenom, TracePath};
-use crate::ibc::core::handler::types::events::{
-    Error as IbcEventError, IbcEvent as RawIbcEvent,
-};
+use crate::ibc::core::handler::types::events::Error as IbcEventError;
 use crate::ibc::primitives::proto::Protobuf;
 use crate::masp::PaymentAddress;
-use crate::tendermint::abci::Event as AbciEvent;
 use crate::token::Transfer;
 
 /// The event type defined in ibc-rs for receiving a token
@@ -59,59 +57,10 @@ impl std::fmt::Display for IbcTokenHash {
 impl FromStr for IbcTokenHash {
     type Err = DecodePartial;
 
-    fn from_str(h: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(h: &str) -> Result<Self, Self::Err> {
         let mut output = [0u8; HASH_LEN];
         HEXLOWER_PERMISSIVE.decode_mut(h.as_ref(), &mut output)?;
         Ok(IbcTokenHash(output))
-    }
-}
-
-/// Wrapped IbcEvent
-#[derive(
-    Debug,
-    Clone,
-    BorshSerialize,
-    BorshDeserialize,
-    BorshDeserializer,
-    BorshSchema,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-)]
-pub struct IbcEvent {
-    /// The IBC event type
-    pub event_type: String,
-    /// The attributes of the IBC event
-    pub attributes: HashMap<String, String>,
-}
-
-impl std::cmp::PartialOrd for IbcEvent {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl std::cmp::Ord for IbcEvent {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // should not compare the same event type
-        self.event_type.cmp(&other.event_type)
-    }
-}
-
-impl std::fmt::Display for IbcEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let attributes = self
-            .attributes
-            .iter()
-            .map(|(k, v)| format!("{}: {};", k, v))
-            .collect::<Vec<String>>()
-            .join(", ");
-        write!(
-            f,
-            "Event type: {}, Attributes: {}",
-            self.event_type, attributes
-        )
     }
 }
 
@@ -171,27 +120,6 @@ pub enum Error {
     DecodingShieldedTransfer(std::io::Error),
 }
 
-/// Conversion functions result
-type Result<T> = std::result::Result<T, Error>;
-
-impl TryFrom<RawIbcEvent> for IbcEvent {
-    type Error = Error;
-
-    fn try_from(e: RawIbcEvent) -> Result<Self> {
-        let event_type = e.event_type().to_string();
-        let abci_event = AbciEvent::try_from(e).map_err(Error::IbcEvent)?;
-        let attributes: HashMap<_, _> = abci_event
-            .attributes
-            .iter()
-            .map(|tag| (tag.key.to_string(), tag.value.to_string()))
-            .collect();
-        Ok(Self {
-            event_type,
-            attributes,
-        })
-    }
-}
-
 /// Returns the trace path and the token string if the denom is an IBC
 /// denom.
 pub fn is_ibc_denom(denom: impl AsRef<str>) -> Option<(TracePath, String)> {
@@ -216,7 +144,7 @@ impl From<IbcShieldedTransfer> for Memo {
 impl TryFrom<Memo> for IbcShieldedTransfer {
     type Error = Error;
 
-    fn try_from(memo: Memo) -> Result<Self> {
+    fn try_from(memo: Memo) -> Result<Self, Error> {
         let bytes = HEXUPPER
             .decode(memo.as_ref().as_bytes())
             .map_err(Error::DecodingHex)?;
@@ -227,7 +155,7 @@ impl TryFrom<Memo> for IbcShieldedTransfer {
 /// Get the shielded transfer from the memo
 pub fn get_shielded_transfer(
     event: &IbcEvent,
-) -> Result<Option<IbcShieldedTransfer>> {
+) -> Result<Option<IbcShieldedTransfer>, Error> {
     if event.event_type != EVENT_TYPE_PACKET {
         // This event is not for receiving a token
         return Ok(None);

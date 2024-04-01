@@ -106,7 +106,10 @@ mod tests {
     use namada_core::hash::Hash;
 
     use super::*;
-    use crate::events::{EventLevel, EventType};
+    use crate::events::EventLevel;
+    use crate::tx::event::types::{
+        ACCEPTED as ACCEPTED_TX, APPLIED as APPLIED_TX,
+    };
 
     const HASH: &str =
         "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
@@ -121,7 +124,7 @@ mod tests {
     /// Return a vector of mock `FinalizeBlock` events.
     fn mock_tx_events(hash: &str) -> Vec<Event> {
         let event_1 = Event {
-            event_type: EventType::Accepted,
+            event_type: ACCEPTED_TX,
             level: EventLevel::Block,
             attributes: {
                 let mut attrs = std::collections::HashMap::new();
@@ -130,7 +133,7 @@ mod tests {
             },
         };
         let event_2 = Event {
-            event_type: EventType::Applied,
+            event_type: APPLIED_TX,
             level: EventLevel::Block,
             attributes: {
                 let mut attrs = std::collections::HashMap::new();

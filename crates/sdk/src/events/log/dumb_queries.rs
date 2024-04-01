@@ -1,4 +1,4 @@
-//! Silly simple Tendermint query parser.
+//! Silly simple Tendermint query parser
 //!
 //! This parser will only work with simple queries of the form:
 //!
@@ -11,11 +11,18 @@ use std::collections::HashMap;
 use namada_core::hash::Hash;
 use namada_core::storage::BlockHeight;
 
+use crate::events::extend::{ExtendAttributesMap, TxHash as TxHashAttr};
 use crate::events::{Event, EventType};
 use crate::ibc::core::client::types::Height as IbcHeight;
 use crate::ibc::core::host::types::identifiers::{
     ChannelId, ClientId, PortId, Sequence,
 };
+use crate::ibc::event::types::UPDATE_CLIENT;
+use crate::ibc::event::{
+    ClientId as ClientIdAttr, ConsensusHeights, PacketDstChannel,
+    PacketDstPort, PacketSequence, PacketSrcChannel, PacketSrcPort,
+};
+use crate::tx::event::types::{ACCEPTED as ACCEPTED_TX, APPLIED as APPLIED_TX};
 
 /// A [`QueryMatcher`] verifies if a Namada event matches a
 /// given Tendermint query.
@@ -44,9 +51,9 @@ impl QueryMatcher {
     /// Returns a query matching the given accepted transaction hash.
     pub fn accepted(tx_hash: Hash) -> Self {
         let mut attributes = HashMap::new();
-        attributes.insert("hash".to_string(), tx_hash.to_string());
+        attributes.with_attribute(TxHashAttr(tx_hash));
         Self {
-            event_type: EventType::Accepted,
+            event_type: ACCEPTED_TX,
             attributes,
         }
     }
@@ -54,9 +61,9 @@ impl QueryMatcher {
     /// Returns a query matching the given applied transaction hash.
     pub fn applied(tx_hash: Hash) -> Self {
         let mut attributes = HashMap::new();
-        attributes.insert("hash".to_string(), tx_hash.to_string());
+        attributes.with_attribute(TxHashAttr(tx_hash));
         Self {
-            event_type: EventType::Applied,
+            event_type: APPLIED_TX,
             attributes,
         }
     }
@@ -66,22 +73,16 @@ impl QueryMatcher {
         client_id: ClientId,
         consensus_height: BlockHeight,
     ) -> Self {
-        use crate::ibc::core::client::types::events::{
-            CLIENT_ID_ATTRIBUTE_KEY, CONSENSUS_HEIGHTS_ATTRIBUTE_KEY,
-            UPDATE_CLIENT_EVENT,
-        };
-
         let mut attributes = HashMap::new();
+
         attributes
-            .insert(CLIENT_ID_ATTRIBUTE_KEY.to_string(), client_id.to_string());
-        attributes.insert(
-            CONSENSUS_HEIGHTS_ATTRIBUTE_KEY.to_string(),
-            IbcHeight::new(0, consensus_height.0)
-                .expect("invalid height")
-                .to_string(),
-        );
+            .with_attribute(ClientIdAttr(client_id))
+            .with_attribute(ConsensusHeights(
+                IbcHeight::new(0, consensus_height.0).expect("invalid height"),
+            ));
+
         Self {
-            event_type: EventType::Ibc(UPDATE_CLIENT_EVENT.to_string()),
+            event_type: UPDATE_CLIENT,
             attributes,
         }
     }
@@ -96,21 +97,14 @@ impl QueryMatcher {
         sequence: Sequence,
     ) -> Self {
         let mut attributes = HashMap::new();
+
         attributes
-            .insert("packet_src_port".to_string(), source_port.to_string());
-        attributes.insert(
-            "packet_src_channel".to_string(),
-            source_channel.to_string(),
-        );
-        attributes.insert(
-            "packet_dst_port".to_string(),
-            destination_port.to_string(),
-        );
-        attributes.insert(
-            "packet_dst_channel".to_string(),
-            destination_channel.to_string(),
-        );
-        attributes.insert("packet_sequence".to_string(), sequence.to_string());
+            .with_attribute(PacketSrcPort(source_port))
+            .with_attribute(PacketSrcChannel(source_channel))
+            .with_attribute(PacketDstPort(destination_port))
+            .with_attribute(PacketDstChannel(destination_channel))
+            .with_attribute(PacketSequence(sequence));
+
         Self {
             event_type,
             attributes,
@@ -129,31 +123,33 @@ mod tests {
         const HASH: &str =
             "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
 
+        let tx_hash: Hash = HASH.parse().unwrap();
+
         let mut attributes = HashMap::new();
-        attributes.insert("hash".to_string(), HASH.to_string());
+        attributes.with_attribute(TxHashAttr(tx_hash));
         let matcher = QueryMatcher {
-            event_type: EventType::Accepted,
+            event_type: ACCEPTED_TX,
             attributes,
         };
 
         let tests = {
             let event_1 = Event {
-                event_type: EventType::Accepted,
+                event_type: ACCEPTED_TX,
                 level: EventLevel::Block,
                 attributes: {
                     let mut attrs = std::collections::HashMap::new();
-                    attrs.insert("hash".to_string(), HASH.to_string());
+                    attrs.with_attribute(TxHashAttr(tx_hash));
                     attrs
                 },
             };
             let accepted_1 = true;
 
             let event_2 = Event {
-                event_type: EventType::Applied,
+                event_type: APPLIED_TX,
                 level: EventLevel::Block,
                 attributes: {
                     let mut attrs = std::collections::HashMap::new();
-                    attrs.insert("hash".to_string(), HASH.to_string());
+                    attrs.with_attribute(TxHashAttr(tx_hash));
                     attrs
                 },
             };
