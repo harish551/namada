@@ -7,7 +7,8 @@ use namada::core::storage::{BlockHash, BlockResults, Epoch, Header};
 use namada::gas::event::GasUsed;
 use namada::governance::pgf::inflation as pgf_inflation;
 use namada::ledger::events::extend::{
-    ComposeEvent, Height, Info, Log, ValidMaspTx,
+    ComposeEvent, Height, Info, Log, RawReadFromEventAttributes, TxHash,
+    ValidMaspTx,
 };
 use namada::ledger::gas::GasMetering;
 use namada::ledger::pos::namada_proof_of_stake;
@@ -390,7 +391,10 @@ where
                             // Wrapper transaction
                             tracing::trace!(
                                 "Wrapper transaction {} was accepted",
-                                tx_event["hash"]
+                                TxHash::raw_read_from_event_attributes(
+                                    &tx_event.attributes
+                                )
+                                .unwrap_or("<unknown>")
                             );
                             if wrapper_args
                                 .expect("Missing required wrapper arguments")
@@ -406,7 +410,10 @@ where
                             tracing::trace!(
                                 "all VPs accepted transaction {} storage \
                                  modification {:#?}",
-                                tx_event["hash"],
+                                TxHash::raw_read_from_event_attributes(
+                                    &tx_event.attributes
+                                )
+                                .unwrap_or("<unknown>"),
                                 result
                             );
                             if result.vps_result.accepted_vps.contains(
@@ -454,7 +461,10 @@ where
                         tracing::trace!(
                             "some VPs rejected transaction {} storage \
                              modification {:#?}",
-                            tx_event["hash"],
+                            TxHash::raw_read_from_event_attributes(
+                                &tx_event.attributes
+                            )
+                            .unwrap_or("<unknown>"),
                             result.vps_result.rejected_vps
                         );
 
@@ -479,7 +489,10 @@ where
                 Err(msg) => {
                     tracing::info!(
                         "Transaction {} failed with: {}",
-                        tx_event["hash"],
+                        TxHash::raw_read_from_event_attributes(
+                            &tx_event.attributes
+                        )
+                        .unwrap_or("<unknown>"),
                         msg
                     );
 
