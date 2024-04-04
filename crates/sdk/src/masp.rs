@@ -45,9 +45,10 @@ use masp_primitives::transaction::{
     TransparentAddress, Unauthorized,
 };
 use masp_primitives::zip32::{ExtendedFullViewingKey, ExtendedSpendingKey};
-use masp_proofs::bellman::groth16::PreparedVerifyingKey;
+use masp_proofs::bellman::groth16::{PreparedVerifyingKey, VerifyingKey};
 use masp_proofs::bls12_381::Bls12;
 use masp_proofs::prover::LocalTxProver;
+use masp_proofs::sapling::BatchValidator;
 #[cfg(not(feature = "testing"))]
 use masp_proofs::sapling::SaplingVerificationContext;
 use namada_core::address::{Address, MASP};
@@ -63,7 +64,8 @@ use namada_ibc::IbcMessage;
 use namada_token::{self as token, Denomination, MaspDigitPos, Transfer};
 use namada_tx::data::{TxResult, WrapperTx};
 use namada_tx::Tx;
-use rand_core::{CryptoRng, OsRng, RngCore};
+use rand::rngs::StdRng;
+use rand_core::{CryptoRng, OsRng, RngCore, SeedableRng};
 use ripemd::Digest as RipemdDigest;
 use sha2::Digest;
 use thiserror::Error;
@@ -153,11 +155,11 @@ pub enum TransferErr {
 /// MASP verifying keys
 pub struct PVKs {
     /// spend verifying key
-    pub spend_vk: PreparedVerifyingKey<Bls12>,
+    pub spend_vk: VerifyingKey<Bls12>,
     /// convert verifying key
-    pub convert_vk: PreparedVerifyingKey<Bls12>,
+    pub convert_vk: VerifyingKey<Bls12>,
     /// output verifying key
-    pub output_vk: PreparedVerifyingKey<Bls12>,
+    pub output_vk: VerifyingKey<Bls12>,
 }
 
 lazy_static! {
@@ -191,9 +193,9 @@ lazy_static! {
             convert_path.as_path(),
         );
         PVKs {
-            spend_vk: params.spend_vk,
-            convert_vk: params.convert_vk,
-            output_vk: params.output_vk
+            spend_vk: params.spend_params.vk,
+            convert_vk: params.convert_params.vk,
+            output_vk: params.output_params.vk
         }
     };
 }
@@ -327,7 +329,7 @@ pub fn verify_shielded_tx<F>(
 where
     F: FnMut(u64) -> std::result::Result<(), namada_state::StorageError>,
 {
-    tracing::info!("entered verify_shielded_tx()");
+    tracing::debug!("entered verify_shielded_tx()");
 
     let sapling_bundle = if let Some(bundle) = transaction.sapling_bundle() {
         bundle
@@ -348,8 +350,7 @@ where
     // for now we need to continue to compute it here.
     let sighash =
         signature_hash(&unauth_tx_data, &SignableInput::Shielded, &txid_parts);
-
-    tracing::info!("sighash computed");
+    tracing::debug!("sighash computed");
 
     let PVKs {
         spend_vk,
@@ -358,45 +359,25 @@ where
     } = load_pvks();
 
     #[cfg(not(feature = "testing"))]
-    let mut ctx = SaplingVerificationContext::new(true);
+    let mut ctx = BatchValidator::new();
     #[cfg(feature = "testing")]
+    // FIXME: need new mock
     let mut ctx = testing::MockSaplingVerificationContext::new(true);
-    for spend in &sapling_bundle.shielded_spends {
-        consume_verify_gas(namada_gas::MASP_VERIFY_SPEND_GAS)?;
-        if !check_spend(spend, sighash.as_ref(), &mut ctx, spend_vk) {
-            return Ok(false);
-        }
+
+    // FIXME: charge gas
+
+    if !ctx.check_bundle(sapling_bundle.to_owned(), sighash.as_ref().to_owned())
+    {
+        return Ok(false);
     }
-    for convert in &sapling_bundle.shielded_converts {
-        consume_verify_gas(namada_gas::MASP_VERIFY_CONVERT_GAS)?;
-        if !check_convert(convert, &mut ctx, convert_vk) {
-            return Ok(false);
-        }
-    }
-    for output in &sapling_bundle.shielded_outputs {
-        consume_verify_gas(namada_gas::MASP_VERIFY_OUTPUT_GAS)?;
-        if !check_output(output, &mut ctx, output_vk) {
-            return Ok(false);
-        }
-    }
-
-    tracing::info!("passed spend/output verification");
-
-    let assets_and_values: I128Sum = sapling_bundle.value_balance.clone();
-
-    tracing::info!(
-        "accumulated {} assets/values",
-        assets_and_values.components().len()
-    );
-
-    consume_verify_gas(namada_gas::MASP_VERIFY_FINAL_GAS)?;
-    let result = ctx.final_check(
-        assets_and_values,
-        sighash.as_ref(),
-        sapling_bundle.authorization.binding_sig,
-    );
-    tracing::info!("final check result {result}");
-    Ok(result)
+    tracing::debug!("passed check bundle");
+    Ok(ctx.validate(
+        spend_vk,
+        convert_vk,
+        output_vk,
+        // FIXME: unwrap
+        StdRng::from_rng(OsRng).unwrap(),
+    ))
 }
 
 /// Get the path to MASP parameters from [`ENV_VAR_MASP_PARAMS_DIR`] env var or
@@ -1958,9 +1939,6 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
         // No shielded components are needed when neither source nor destination
         // are shielded
 
-        use rand::rngs::StdRng;
-        use rand_core::SeedableRng;
-
         let spending_key = source.spending_key();
         let payment_address = target.payment_address();
         // No shielded components are needed when neither source nor
@@ -2294,10 +2272,10 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
 
         let builder_clone = builder.clone().map_builder(WalletMap);
         // Build and return the constructed transaction
-        #[cfg(not(feature = "testing"))]
+        // #[cfg(not(feature = "testing"))]
         let prover = context.shielded().await.utils.local_tx_prover();
-        #[cfg(feature = "testing")]
-        let prover = testing::MockTxProver(std::sync::Mutex::new(OsRng));
+        // #[cfg(feature = "testing")]
+        // let prover = testing::MockTxProver(std::sync::Mutex::new(OsRng));
         let (masp_tx, metadata) =
             builder.build(&prover, &FeeRule::non_standard(U64Sum::zero()))?;
 
