@@ -1,5 +1,5 @@
 //! Client RPC queries
-
+#![allow(unused_imports)]
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::{self, read_dir};
@@ -51,7 +51,8 @@ use namada::{state as storage, token};
 use namada_sdk::error::{
     is_pinned_error, Error, PinnedBalanceError, QueryError,
 };
-use namada_sdk::masp::{Conversions, MaspChange, MaspTokenRewardData};
+use namada_sdk::masp::fs::FsShieldedUtils;
+use namada_sdk::masp::types::{Conversions, MaspChange, MaspTokenRewardData};
 use namada_sdk::proof_of_stake::types::ValidatorMetaData;
 use namada_sdk::queries::Client;
 use namada_sdk::rpc::{
@@ -60,12 +61,15 @@ use namada_sdk::rpc::{
 use namada_sdk::tendermint_rpc::endpoint::status;
 use namada_sdk::tx::{display_inner_resp, display_wrapper_resp_and_get_result};
 use namada_sdk::wallet::AddressVpType;
-use namada_sdk::{display, display_line, edisplay_line, error, prompt, Namada};
+use namada_sdk::{
+    display, display_line, edisplay_line, error, prompt, Namada, NamadaImpl,
+};
 use tokio::time::Instant;
 
 use crate::cli::{self, args};
 use crate::facade::tendermint::merkle::proof::ProofOps;
 use crate::facade::tendermint_rpc::error::Error as TError;
+use crate::wallet::CliWalletUtils;
 
 /// Query the status of a given transaction.
 ///
@@ -163,9 +167,9 @@ pub async fn query_results<C: namada::ledger::queries::Client + Sync>(
     )
 }
 
-/// Query the specified accepted transfers from the ledger
-pub async fn query_transfers(
-    context: &impl Namada,
+// Query the specified accepted transfers from the ledger
+pub async fn query_transfers<C: Client + Sync, IO: Io + Send + Sync>(
+    context: &NamadaImpl<C, CliWalletUtils, FsShieldedUtils, IO>,
     args: args::QueryTransfers,
 ) {
     let query_token = args.token;

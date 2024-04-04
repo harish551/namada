@@ -12,7 +12,7 @@ use crate::cli::cmds::*;
 use crate::client::{rpc, tx, utils};
 
 impl CliApi {
-    pub async fn handle_client_command<C, IO: Io>(
+    pub async fn handle_client_command<C, IO: Io + Send + Sync>(
         client: Option<C>,
         cmd: cli::NamadaClient,
         io: IO,
@@ -484,7 +484,14 @@ impl CliApi {
                         });
                         client.wait_until_node_is_synced(&io).await?;
                         let args = args.to_sdk(&mut ctx);
-                        let namada = ctx.to_sdk(client, io);
+                        let chain_ctx = ctx.take_chain_or_exit();
+                        let namada = NamadaImpl::native_new(
+                            client,
+                            chain_ctx.wallet,
+                            chain_ctx.shielded,
+                            io,
+                            chain_ctx.native_token,
+                        );
                         rpc::query_transfers(&namada, args).await;
                     }
                     Sub::QueryConversions(QueryConversions(args)) => {
