@@ -776,6 +776,7 @@ mod test_finalize_block {
     use namada::governance::storage::keys::get_proposal_execution_key;
     use namada::governance::storage::proposal::ProposalType;
     use namada::governance::{InitProposalData, VoteProposalData};
+    use namada::ledger::events::extend::ReadFromEventAttributes;
     use namada::ledger::gas::VpGasMeter;
     use namada::ledger::native_vp::parameters::ParametersVp;
     use namada::ledger::native_vp::NativeVp;
@@ -799,6 +800,7 @@ mod test_finalize_block {
     use namada::token::{Amount, DenominatedAmount, NATIVE_MAX_DECIMAL_PLACES};
     use namada::tx::data::Fee;
     use namada::tx::event::types::APPLIED as APPLIED_TX;
+    use namada::tx::event::Code as CodeAttr;
     use namada::tx::{Code, Data, Signature};
     use namada::vote_ext::ethereum_events;
     use namada_sdk::eth_bridge::MinimumConfirmations;
@@ -958,8 +960,10 @@ mod test_finalize_block {
             .enumerate()
         {
             assert_eq!(event.event_type, ACCEPTED_TX);
-            let code = event.attributes.get("code").expect("Test failed");
-            assert_eq!(code, &index.rem_euclid(2).to_string());
+            let code = CodeAttr::read_from_event_attributes(&event.attributes)
+                .expect("Test failed")
+                .to_usize();
+            assert_eq!(code, index.rem_euclid(2));
         }
         // verify that the queue of wrapper txs to be processed is correct
         let mut valid_tx = valid_wrappers.iter();
@@ -1025,8 +1029,9 @@ mod test_finalize_block {
             .expect("Test failed")
         {
             assert_eq!(event.event_type, APPLIED_TX);
-            let code = event.attributes.get("code").expect("Test failed");
-            assert_eq!(code, &String::from(ResultCode::InvalidTx));
+            let code = CodeAttr::read_from_event_attributes(&event.attributes)
+                .expect("Test failed");
+            assert_eq!(code, ResultCode::InvalidTx);
         }
         // check that the corresponding wrapper tx was removed from the queue
         assert!(shell.state.in_mem().tx_queue.is_empty());
@@ -1075,9 +1080,11 @@ mod test_finalize_block {
             .expect("Test failed")
         {
             assert_eq!(event.event_type, APPLIED_TX);
-            let code = event.attributes.get("code").expect("Test failed");
-            assert_eq!(code, &String::from(ResultCode::Undecryptable));
-            let log = event.attributes.get("log").expect("Test failed");
+            let code = CodeAttr::read_from_event_attributes(&event.attributes)
+                .expect("Test failed");
+            assert_eq!(code, ResultCode::Undecryptable);
+            let log = Log::read_from_event_attributes(&event.attributes)
+                .expect("Test failed");
             assert!(log.contains("Transaction could not be decrypted."))
         }
         // check that the corresponding wrapper tx was removed from the queue
@@ -1130,14 +1137,16 @@ mod test_finalize_block {
                 // these should be accepted wrapper txs
                 assert_eq!(event.event_type, ACCEPTED_TX);
                 let code =
-                    event.attributes.get("code").expect("Test failed").as_str();
-                assert_eq!(code, String::from(ResultCode::Ok).as_str());
+                    CodeAttr::read_from_event_attributes(&event.attributes)
+                        .expect("Test failed");
+                assert_eq!(code, ResultCode::Ok);
             } else {
                 // these should be accepted decrypted txs
                 assert_eq!(event.event_type, APPLIED_TX);
                 let code =
-                    event.attributes.get("code").expect("Test failed").as_str();
-                assert_eq!(code, String::from(ResultCode::Ok).as_str());
+                    CodeAttr::read_from_event_attributes(&event.attributes)
+                        .expect("Test failed");
+                assert_eq!(code, ResultCode::Ok);
             }
         }
 
@@ -1185,8 +1194,9 @@ mod test_finalize_block {
         assert_eq!(resp.len(), 1);
         let event = resp.remove(0);
         assert_eq!(event.event_type, APPLIED_TX);
-        let code = event.attributes.get("code").expect("Test failed");
-        assert_eq!(code, &String::from(ResultCode::InvalidTx));
+        let code = CodeAttr::read_from_event_attributes(&event.attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::InvalidTx);
     }
 
     /// Test that once a validator's vote for an Ethereum event lands
@@ -1261,8 +1271,9 @@ mod test_finalize_block {
             .try_into()
             .expect("Test failed");
         assert_eq!(result.event_type, APPLIED_TX);
-        let code = result.attributes.get("code").expect("Test failed").as_str();
-        assert_eq!(code, String::from(ResultCode::Ok).as_str());
+        let code = CodeAttr::read_from_event_attributes(&result.attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::Ok);
 
         // --- The event is removed from the queue
         assert!(shell.new_ethereum_events().is_empty());
@@ -1320,8 +1331,9 @@ mod test_finalize_block {
             .try_into()
             .expect("Test failed");
         assert_eq!(result.event_type, APPLIED_TX);
-        let code = result.attributes.get("code").expect("Test failed").as_str();
-        assert_eq!(code, String::from(ResultCode::Ok).as_str());
+        let code = CodeAttr::read_from_event_attributes(&result.attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::Ok);
 
         // --- The event is removed from the queue
         assert!(shell.new_ethereum_events().is_empty());
@@ -2718,15 +2730,9 @@ mod test_finalize_block {
             })
             .expect("Test failed")[0];
         assert_eq!(event.event_type, ACCEPTED_TX);
-        let code = event
-            .attributes
-            .get("code")
-            .expect(
-                "Test
-        failed",
-            )
-            .as_str();
-        assert_eq!(code, String::from(ResultCode::Ok).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event.attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::Ok);
 
         // the merkle tree root should not change after finalize_block
         let root_post = shell.shell.state.in_mem().block.tree.root();
@@ -2847,11 +2853,13 @@ mod test_finalize_block {
         assert_eq!(root_pre.0, root_post.0);
 
         assert_eq!(event[0].event_type, APPLIED_TX);
-        let code = event[0].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::Ok).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[0].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::Ok);
         assert_eq!(event[1].event_type, APPLIED_TX);
-        let code = event[1].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::WasmRuntimeError).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[1].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::WasmRuntimeError);
 
         for (inner, wrapper) in [(inner, wrapper), (new_inner, new_wrapper)] {
             assert!(
@@ -3004,20 +3012,25 @@ mod test_finalize_block {
         assert_eq!(root_pre.0, root_post.0);
 
         assert_eq!(event[0].event_type, APPLIED_TX);
-        let code = event[0].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::WasmRuntimeError).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[0].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::WasmRuntimeError);
         assert_eq!(event[1].event_type, APPLIED_TX);
-        let code = event[1].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::Undecryptable).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[1].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::Undecryptable);
         assert_eq!(event[2].event_type, APPLIED_TX);
-        let code = event[2].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::InvalidTx).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[2].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::InvalidTx);
         assert_eq!(event[3].event_type, APPLIED_TX);
-        let code = event[3].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::WasmRuntimeError).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[3].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::WasmRuntimeError);
         assert_eq!(event[4].event_type, APPLIED_TX);
-        let code = event[4].attributes.get("code").unwrap().as_str();
-        assert_eq!(code, String::from(ResultCode::WasmRuntimeError).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[4].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::WasmRuntimeError);
 
         for (invalid_inner, valid_wrapper) in [
             (out_of_gas_inner, out_of_gas_wrapper),
@@ -3113,12 +3126,9 @@ mod test_finalize_block {
         assert_eq!(root_pre.0, root_post.0);
 
         assert_eq!(event[0].event_type, ACCEPTED_TX);
-        let code = event[0]
-            .attributes
-            .get("code")
-            .expect("Test failed")
-            .as_str();
-        assert_eq!(code, String::from(ResultCode::InvalidTx).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event[0].attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::InvalidTx);
 
         assert!(
             shell
@@ -3183,8 +3193,9 @@ mod test_finalize_block {
 
         // Check balance of fee payer is 0
         assert_eq!(event.event_type, ACCEPTED_TX);
-        let code = event.attributes.get("code").expect("Testfailed").as_str();
-        assert_eq!(code, String::from(ResultCode::InvalidTx).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event.attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::InvalidTx);
         let balance_key = token::storage_key::balance_key(
             &shell.state.in_mem().native_token,
             &Address::from(&keypair.to_public()),
@@ -3284,8 +3295,9 @@ mod test_finalize_block {
 
         // Check fee payment
         assert_eq!(event.event_type, ACCEPTED_TX);
-        let code = event.attributes.get("code").expect("Test failed").as_str();
-        assert_eq!(code, String::from(ResultCode::Ok).as_str());
+        let code = CodeAttr::read_from_event_attributes(&event.attributes)
+            .expect("Test failed");
+        assert_eq!(code, ResultCode::Ok);
 
         let new_proposer_balance = namada::token::read_balance(
             &shell.state,
