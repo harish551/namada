@@ -3508,8 +3508,10 @@ name = "namada_gas"
 version = "0.32.1"
 dependencies = [
  "borsh",
+ "linkme",
  "namada_core",
  "namada_macros",
+ "namada_migrations",
  "serde",
  "thiserror",
 ]
@@ -3666,6 +3668,7 @@ dependencies = [
  "namada_account",
  "namada_core",
  "namada_ethereum_bridge",
+ "namada_gas",
  "namada_governance",
  "namada_ibc",
  "namada_macros",
