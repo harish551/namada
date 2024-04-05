@@ -6,7 +6,6 @@ use std::env;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use borsh_ext::BorshSerializeExt;
@@ -52,6 +51,9 @@ use masp_proofs::prover::LocalTxProver;
 use masp_proofs::sapling::SaplingVerificationContext;
 use namada_core::address::{Address, MASP};
 use namada_core::dec::Dec;
+use namada_core::event::extend::{
+    ReadFromEventAttributes, ValidMaspTx as ValidMaspTxAttr,
+};
 pub use namada_core::masp::{
     encode_asset_type, AssetData, BalanceOwner, ExtendedViewingKey,
     PaymentAddress, TransferSource, TransferTarget,
@@ -64,7 +66,8 @@ use namada_macros::BorshDeserializer;
 #[cfg(feature = "migrations")]
 use namada_migrations::*;
 use namada_token::{self as token, Denomination, MaspDigitPos, Transfer};
-use namada_tx::data::{TxResult, WrapperTx};
+use namada_tx::data::WrapperTx;
+use namada_tx::event::InnerTx as InnerTxAttr;
 use namada_tx::Tx;
 use rand_core::{CryptoRng, OsRng, RngCore};
 use ripemd::Digest as RipemdDigest;
@@ -914,25 +917,12 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
                     if let ExtractShieldedActionArg::Event(tx_event) =
                         action_arg
                     {
-                        let tx_result_str = tx_event
-                            .attributes
-                            .iter()
-                            .find_map(|attr| {
-                                if attr.key == "inner_tx" {
-                                    Some(&attr.value)
-                                } else {
-                                    None
-                                }
-                            })
-                            .ok_or_else(|| {
-                                Error::Other(
-                                    "Missing required tx result in event"
-                                        .to_string(),
-                                )
-                            })?;
-                        TxResult::from_str(tx_result_str)
-                            .map_err(|e| Error::Other(e.to_string()))?
-                            .changed_keys
+                        let tx_result =
+                            InnerTxAttr::read_from_event_attributes(
+                                &tx_event.attributes,
+                            )
+                            .map_err(|err| Error::Other(err.to_string()))?;
+                        tx_result.changed_keys
                     } else {
                         BTreeSet::default()
                     };
@@ -978,25 +968,12 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
                         if let ExtractShieldedActionArg::Event(tx_event) =
                             action_arg
                         {
-                            let tx_result_str = tx_event
-                                .attributes
-                                .iter()
-                                .find_map(|attr| {
-                                    if attr.key == "inner_tx" {
-                                        Some(&attr.value)
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .ok_or_else(|| {
-                                    Error::Other(
-                                        "Missing required tx result in event"
-                                            .to_string(),
-                                    )
-                                })?;
-                            TxResult::from_str(tx_result_str)
-                                .map_err(|e| Error::Other(e.to_string()))?
-                                .changed_keys
+                            let tx_result =
+                                InnerTxAttr::read_from_event_attributes(
+                                    &tx_event.attributes,
+                                )
+                                .map_err(|err| Error::Other(err.to_string()))?;
+                            tx_result.changed_keys
                         } else {
                             BTreeSet::default()
                         };
@@ -1989,8 +1966,8 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
             .and_then(|seed| {
                 let exp_str =
                     format!("Env var {ENV_VAR_MASP_TEST_SEED} must be a u64.");
-                let parsed_seed: u64 = FromStr::from_str(&seed)
-                    .map_err(|_| Error::Other(exp_str))?;
+                let parsed_seed: u64 =
+                    seed.parse().map_err(|_| Error::Other(exp_str))?;
                 Ok(parsed_seed)
             }) {
             tracing::warn!(
@@ -2597,26 +2574,15 @@ async fn get_indexed_masp_events_at_height<C: Client + Sync>(
             events
                 .into_iter()
                 .filter_map(|event| {
-                    let tx_index =
-                        event.attributes.iter().find_map(|attribute| {
-                            if attribute.key == "is_valid_masp_tx" {
-                                Some(TxIndex(
-                                    u32::from_str(&attribute.value).unwrap(),
-                                ))
-                            } else {
-                                None
-                            }
-                        });
+                    let tx_index = ValidMaspTxAttr::read_from_event_attributes(
+                        &event.attributes,
+                    )
+                    .ok()?;
 
-                    match tx_index {
-                        Some(idx) => {
-                            if idx >= first_idx_to_query {
-                                Some((idx, event))
-                            } else {
-                                None
-                            }
-                        }
-                        None => None,
+                    if tx_index >= first_idx_to_query {
+                        Some((tx_index, event))
+                    } else {
+                        None
                     }
                 })
                 .collect::<Vec<_>>()
@@ -2648,25 +2614,18 @@ async fn extract_payload_from_shielded_action<'args, C: Client + Sync>(
                 }
             };
 
-            let changed_keys = tx_event
-                .attributes
-                .iter()
-                .find_map(|attribute| {
-                    if attribute.key == "inner_tx" {
-                        let tx_result =
-                            TxResult::from_str(&attribute.value).unwrap();
-                        Some(tx_result.changed_keys)
-                    } else {
-                        None
-                    }
-                })
-                .ok_or_else(|| {
-                    Error::Other(
+            let changed_keys = {
+                let tx_result = InnerTxAttr::read_from_event_attributes(
+                    &tx_event.attributes,
+                )
+                .map_err(|err| {
+                    Error::Other(format!(
                         "Couldn't find changed keys in the event for the \
-                         provided transaction"
-                            .to_string(),
-                    )
+                         provided transaction: {err}"
+                    ))
                 })?;
+                tx_result.changed_keys
+            };
 
             (changed_keys, msg.shielded_transfer.masp_tx)
         }
@@ -2700,38 +2659,26 @@ async fn extract_payload_from_shielded_action<'args, C: Client + Sync>(
                 }
             };
 
-            tx_event
-                .attributes
+            let tx_result =
+                InnerTxAttr::read_from_event_attributes(&tx_event.attributes)
+                    .map_err(|err| Error::Other(err.to_string()))?;
+
+            let transfer = tx_result
+                .ibc_events
                 .iter()
-                .find_map(|attribute| {
-                    if attribute.key == "inner_tx" {
-                        let tx_result =
-                            TxResult::from_str(&attribute.value).unwrap();
-                        for ibc_event in &tx_result.ibc_events {
-                            let event =
-                                namada_core::ibc::get_shielded_transfer(
-                                    ibc_event,
-                                )
-                                .ok()
-                                .flatten();
-                            if let Some(transfer) = event {
-                                return Some((
-                                    tx_result.changed_keys,
-                                    transfer.masp_tx,
-                                ));
-                            }
-                        }
-                        None
-                    } else {
-                        None
-                    }
+                .find_map(|ibc_event| {
+                    namada_core::ibc::get_shielded_transfer(ibc_event)
+                        .ok()
+                        .flatten()
                 })
                 .ok_or_else(|| {
                     Error::Other(
                         "Couldn't deserialize masp tx to ibc message envelope"
                             .to_string(),
                     )
-                })?
+                })?;
+
+            (tx_result.changed_keys, transfer.masp_tx)
         }
         _ => {
             return Err(Error::Other(
