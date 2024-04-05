@@ -48,6 +48,7 @@ use namada::ledger::pos::PosParams;
 use namada::ledger::queries::RPC;
 use namada::proof_of_stake::types::{ValidatorState, WeightedValidator};
 use namada::{state as storage, token};
+use namada_sdk::control_flow::time::{Duration, Instant};
 use namada_sdk::error::{
     is_pinned_error, Error, PinnedBalanceError, QueryError,
 };
@@ -61,11 +62,9 @@ use namada_sdk::tendermint_rpc::endpoint::status;
 use namada_sdk::tx::{display_inner_resp, display_wrapper_resp_and_get_result};
 use namada_sdk::wallet::AddressVpType;
 use namada_sdk::{display, display_line, edisplay_line, error, prompt, Namada};
-use tokio::time::Instant;
 
 use crate::cli::{self, args};
 use crate::facade::tendermint::merkle::proof::ProofOps;
-use crate::facade::tendermint_rpc::error::Error as TError;
 
 /// Query the status of a given transaction.
 ///
@@ -2747,37 +2746,55 @@ pub async fn query_tx_events<C: namada::ledger::queries::Client + Sync>(
     namada_sdk::rpc::query_tx_events(client, tx_event_query).await
 }
 
-/// Lookup the full response accompanying the specified transaction event
-// TODO: maybe remove this in favor of `query_tx_status`
-pub async fn query_tx_response<C: namada::ledger::queries::Client + Sync>(
-    client: &C,
-    tx_query: namada_sdk::rpc::TxEventQuery<'_>,
-) -> Result<TxResponse, TError> {
-    namada_sdk::rpc::query_tx_response(client, tx_query).await
-}
-
 /// Lookup the results of applying the specified transaction to the
 /// blockchain.
 pub async fn query_result(context: &impl Namada, args: args::QueryResult) {
-    // First try looking up application event pertaining to given hash.
-    let inner_resp = query_tx_response(
-        context.client(),
+    display_line!(
+        context.io(),
+        "Checking if tx {} is applied...",
+        args.tx_hash
+    );
+
+    match rpc::query_tx_status(
+        context,
         namada_sdk::rpc::TxEventQuery::Applied(&args.tx_hash),
+        Instant::now() + Duration::from_secs(5),
     )
-    .await;
-    match inner_resp {
+    .await
+    {
         Ok(resp) => {
+            let resp = match TxResponse::try_from(resp) {
+                Ok(resp) => resp,
+                Err(err) => {
+                    edisplay_line!(context.io(), "{err}");
+                    cli::safe_exit(1)
+                }
+            };
             display_inner_resp(context, &resp);
         }
         Err(err1) => {
+            display_line!(
+                context.io(),
+                "Checking if tx {} is accepted...",
+                args.tx_hash
+            );
+
             // If this fails then instead look for an acceptance event.
-            let wrapper_resp = query_tx_response(
-                context.client(),
+            let wrapper_resp = rpc::query_tx_status(
+                context,
                 namada_sdk::rpc::TxEventQuery::Accepted(&args.tx_hash),
+                Instant::now() + Duration::from_secs(5),
             )
             .await;
             match wrapper_resp {
                 Ok(resp) => {
+                    let resp = match TxResponse::try_from(resp) {
+                        Ok(resp) => resp,
+                        Err(err) => {
+                            edisplay_line!(context.io(), "{err}");
+                            cli::safe_exit(1)
+                        }
+                    };
                     display_wrapper_resp_and_get_result(context, &resp);
                 }
                 Err(err2) => {
