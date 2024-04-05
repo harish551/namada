@@ -431,7 +431,7 @@ where
                             }
                         }
                         self.state.commit_tx();
-                        if !tx_event.contains_key("code") {
+                        if !tx_event.has_attribute::<Code>() {
                             tx_event.extend(Code(ResultCode::Ok));
                             self.state
                                 .in_mem_mut()
