@@ -4,7 +4,9 @@
 pub mod event;
 
 use std::fmt::Display;
+use std::num::ParseIntError;
 use std::ops::Div;
+use std::str::FromStr;
 
 use namada_core::borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 use namada_macros::BorshDeserializer;
@@ -23,6 +25,11 @@ pub enum Error {
     #[error("Overflow during gas operations")]
     GasOverflow,
 }
+
+#[allow(missing_docs)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[error("Failed to parse gas: {0}")]
+pub struct GasParseError(pub ParseIntError);
 
 const COMPILE_GAS_PER_BYTE: u64 = 24;
 const PARALLEL_GAS_DIVIDER: u64 = 10;
@@ -141,6 +148,15 @@ impl Display for Gas {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Display the gas in whole amounts
         write!(f, "{}", self.get_whole_gas_units())
+    }
+}
+
+impl FromStr for Gas {
+    type Err = GasParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let gas: u64 = s.parse().map_err(GasParseError)?;
+        Ok(Gas::from_whole_units(gas))
     }
 }
 
