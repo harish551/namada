@@ -370,11 +370,7 @@ where
                     protocol::dispatch_tx(
                         tx,
                         processed_tx.tx.as_ref(),
-                        TxIndex(
-                            tx_index
-                                .try_into()
-                                .expect("transaction index out of bounds"),
-                        ),
+                        TxIndex::must_from_usize(tx_index),
                         &tx_gas_meter,
                         &mut self.state,
                         &mut self.vp_wasm_cache,
@@ -400,7 +396,9 @@ where
                                 .expect("Missing required wrapper arguments")
                                 .is_committed_fee_unshield
                             {
-                                tx_event.extend(ValidMaspTx(tx_index));
+                                tx_event.extend(ValidMaspTx(
+                                    TxIndex::must_from_usize(tx_index),
+                                ));
                             }
                             self.state.in_mem_mut().tx_queue.push(TxInQueue {
                                 tx: wrapper.expect("Missing expected wrapper"),
@@ -421,7 +419,9 @@ where
                                     address::InternalAddress::Masp,
                                 ),
                             ) {
-                                tx_event.extend(ValidMaspTx(tx_index));
+                                tx_event.extend(ValidMaspTx(
+                                    TxIndex::must_from_usize(tx_index),
+                                ));
                             }
                             changed_keys
                                 .extend(result.changed_keys.iter().cloned());
@@ -543,7 +543,9 @@ where
                             .expect("Missing required wrapper arguments")
                             .is_committed_fee_unshield
                         {
-                            tx_event.extend(ValidMaspTx(tx_index));
+                            tx_event.extend(ValidMaspTx(
+                                TxIndex::must_from_usize(tx_index),
+                            ));
                         }
                     } else {
                         tx_event.extend(Code(ResultCode::WasmRuntimeError));
