@@ -16,11 +16,12 @@ use thiserror::Error;
 
 pub use self::event::IbcEvent;
 use super::address::HASH_LEN;
+use crate::event::extend::{ReadFromEventAttributes, Success as SuccessAttr};
+use crate::event::EventError;
 use crate::ibc::apps::transfer::types::msgs::transfer::MsgTransfer;
 use crate::ibc::apps::transfer::types::{Memo, PrefixedDenom, TracePath};
 use crate::ibc::core::handler::types::events::Error as IbcEventError;
 use crate::ibc::primitives::proto::Protobuf;
-use crate::masp::PaymentAddress;
 use crate::token::Transfer;
 
 /// The event type defined in ibc-rs for receiving a token
@@ -109,9 +110,27 @@ pub struct IbcShieldedTransfer {
     pub masp_tx: masp_primitives::transaction::Transaction,
 }
 
+impl std::fmt::Display for IbcShieldedTransfer {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Memo::from(self))
+    }
+}
+
+impl FromStr for IbcShieldedTransfer {
+    type Err = Error;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Error> {
+        Memo::from(s.to_owned()).try_into()
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("Event error: {0}")]
+    Event(EventError),
     #[error("IBC event error: {0}")]
     IbcEvent(IbcEventError),
     #[error("IBC transfer memo HEX decoding error: {0}")]
@@ -134,10 +153,16 @@ pub fn is_ibc_denom(denom: impl AsRef<str>) -> Option<(TracePath, String)> {
     ))
 }
 
-impl From<IbcShieldedTransfer> for Memo {
-    fn from(shielded: IbcShieldedTransfer) -> Self {
+impl From<&IbcShieldedTransfer> for Memo {
+    fn from(shielded: &IbcShieldedTransfer) -> Self {
         let bytes = shielded.serialize_to_vec();
         HEXUPPER.encode(&bytes).into()
+    }
+}
+
+impl From<IbcShieldedTransfer> for Memo {
+    fn from(shielded: IbcShieldedTransfer) -> Self {
+        (&shielded).into()
     }
 }
 
@@ -161,20 +186,20 @@ pub fn get_shielded_transfer(
         return Ok(None);
     }
     let is_success =
-        event.attributes.get("success") == Some(&"true".to_string());
-    let receiver = event.attributes.get("receiver");
-    let is_shielded = if let Some(receiver) = receiver {
-        PaymentAddress::from_str(receiver).is_ok()
-    } else {
-        false
-    };
+        SuccessAttr::read_from_event_attributes(&event.attributes).is_ok();
+    let is_shielded =
+        event::ShieldedReceiver::read_from_event_attributes(&event.attributes)
+            .is_ok();
     if !is_success || !is_shielded {
         return Ok(None);
     }
 
-    event
-        .attributes
-        .get("memo")
-        .map(|memo| IbcShieldedTransfer::try_from(Memo::from(memo.clone())))
-        .transpose()
+    event::ShieldedTransfer::read_from_event_attributes(&event.attributes)
+        .map_or_else(
+            |err| match err {
+                EventError::MissingAttribute(_) => Ok(None),
+                err => Err(Error::Event(err)),
+            },
+            |tx| Ok(Some(tx)),
+        )
 }
