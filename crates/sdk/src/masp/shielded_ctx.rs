@@ -1481,7 +1481,7 @@ impl<U: ShieldedUtils + MaybeSend + MaybeSync> ShieldedContext<U> {
                 shortfall += I128Sum::from_pair(*asset_type, val.into())
                     .expect("unable to construct value sum");
             }
-            // Return an insufficient ffunds error
+            // Return an insufficient funds error
             return Result::Err(TransferErr::from(
                 builder::Error::InsufficientFunds(shortfall),
             ));
@@ -1730,6 +1730,7 @@ impl<U: ShieldedUtils + Send> ShieldedContext<U> {
             self.vk_heights.entry(*vk).or_default();
         }
         let _ = self.save().await;
+
         let native_token = query_native_token(client).await?;
         // the latest block height which has been added to the witness Merkle
         // tree
@@ -1757,7 +1758,7 @@ impl<U: ShieldedUtils + Send> ShieldedContext<U> {
         std::thread::scope(|s| {
             loop {
                 let (fetch_send, fetch_recv) =
-                    fetch_channel::new(self.unscanned.clone(), last_query_height);
+                    fetch_channel::new(self.unscanned.clone());
                 let decryption_handle = s.spawn(|| {
                     let txs = logger.scan(fetch_recv);
                     for (indexed_tx, (epoch, tx, stx)) in txs {
