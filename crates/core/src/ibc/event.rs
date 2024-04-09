@@ -10,7 +10,7 @@ use namada_migrations::*;
 use serde::{Deserialize, Serialize};
 
 use super::IbcShieldedTransfer;
-use crate::address::Address;
+use crate::address::{Address, MASP};
 use crate::borsh::*;
 use crate::event::extend::{
     AttributesMap, EventAttributeEntry, ReadFromEventAttributes as _,
@@ -400,6 +400,26 @@ impl FromStr for OwnedIbcReceiver {
                      {s:?}"
                 )
             })
+    }
+}
+
+impl OwnedIbcReceiver {
+    /// Return a reference to the owned values.
+    pub fn as_ref(&self) -> BorrowedIbcReceiver<'_> {
+        match self {
+            Self::Transparent(addr) => IbcReceiver::Transparent(addr),
+            Self::Shielded(addr) => IbcReceiver::Shielded(addr),
+        }
+    }
+}
+
+impl BorrowedIbcReceiver<'_> {
+    /// Return a transparent address from this [`IbcReceiver`].
+    pub fn transparent_address(&self) -> &Address {
+        match self {
+            Self::Transparent(addr) => addr,
+            Self::Shielded(_) => &MASP,
+        }
     }
 }
 
