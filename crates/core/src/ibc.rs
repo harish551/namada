@@ -194,12 +194,6 @@ pub fn get_shielded_transfer(
         return Ok(None);
     }
 
-    event::ShieldedTransfer::read_from_event_attributes(&event.attributes)
-        .map_or_else(
-            |err| match err {
-                EventError::MissingAttribute(_) => Ok(None),
-                err => Err(Error::Event(err)),
-            },
-            |tx| Ok(Some(tx)),
-        )
+    event::ShieldedTransfer::read_opt_from_event_attributes(&event.attributes)
+        .map_err(Error::Event)
 }
