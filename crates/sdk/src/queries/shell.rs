@@ -520,12 +520,7 @@ where
     H: 'static + StorageHasher + Sync,
 {
     let matcher = dumb_queries::QueryMatcher::accepted(tx_hash);
-    Ok(ctx
-        .event_log
-        .iter_with_matcher(matcher)
-        .by_ref()
-        .next()
-        .cloned())
+    Ok(ctx.event_log.with_matcher(matcher).iter().next().cloned())
 }
 
 fn applied<D, H, V, T>(
@@ -537,12 +532,7 @@ where
     H: 'static + StorageHasher + Sync,
 {
     let matcher = dumb_queries::QueryMatcher::applied(tx_hash);
-    Ok(ctx
-        .event_log
-        .iter_with_matcher(matcher)
-        .by_ref()
-        .next()
-        .cloned())
+    Ok(ctx.event_log.with_matcher(matcher).iter().next().cloned())
 }
 
 fn ibc_client_update<D, H, V, T>(
@@ -558,12 +548,7 @@ where
         client_id,
         consensus_height,
     );
-    Ok(ctx
-        .event_log
-        .iter_with_matcher(matcher)
-        .by_ref()
-        .next()
-        .cloned())
+    Ok(ctx.event_log.with_matcher(matcher).iter().next().cloned())
 }
 
 fn ibc_packet<D, H, V, T>(
@@ -587,12 +572,7 @@ where
         destination_channel,
         sequence,
     );
-    Ok(ctx
-        .event_log
-        .iter_with_matcher(matcher)
-        .by_ref()
-        .next()
-        .cloned())
+    Ok(ctx.event_log.with_matcher(matcher).iter().next().cloned())
 }
 
 fn account<D, H, V, T>(
