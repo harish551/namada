@@ -7,7 +7,6 @@ pub mod storage;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
-use std::str::FromStr;
 
 pub use actions::{transfer_over_ibc, CompatibleIbcTxHostEnvState};
 use borsh::BorshDeserialize;
@@ -18,7 +17,8 @@ pub use context::token_transfer::TokenTransferContext;
 pub use context::transfer_mod::{ModuleWrapper, TransferModule};
 use context::IbcContext;
 pub use context::ValidationParams;
-use namada_core::address::{Address, MASP};
+use namada_core::address::Address;
+use namada_core::event::extend::ReadFromEventAttributes;
 use namada_core::ibc::apps::transfer::handler::{
     send_transfer_execute, send_transfer_validate,
 };
@@ -35,9 +35,9 @@ use namada_core::ibc::core::host::types::error::IdentifierError;
 use namada_core::ibc::core::host::types::identifiers::{ChannelId, PortId};
 use namada_core::ibc::core::router::types::error::RouterError;
 use namada_core::ibc::core::router::types::module::ModuleId;
+use namada_core::ibc::event as ibc_events;
 use namada_core::ibc::primitives::proto::Any;
 pub use namada_core::ibc::*;
-use namada_core::masp::PaymentAddress;
 use prost::Message;
 use thiserror::Error;
 
@@ -54,6 +54,8 @@ pub enum Error {
     TokenTransfer(TokenTransferError),
     #[error("Denom error: {0}")]
     Denom(String),
+    #[error("Failed to get minted token info: {0}")]
+    MintedTokenInfo(String),
     #[error("Invalid chain ID: {0}")]
     ChainId(IdentifierError),
     #[error("Handling MASP transaction error: {0}")]
@@ -176,51 +178,78 @@ where
     fn get_minted_token_info(
         &self,
     ) -> Result<Option<(String, String, String)>, Error> {
-        let receive_event = self
-            .ctx
-            .inner
-            .borrow()
-            .get_ibc_events(EVENT_TYPE_PACKET)
-            .map_err(|_| {
-                Error::Denom("Reading the IBC event failed".to_string())
-            })?;
-        // The receiving event should be only one in the single IBC transaction
-        let receiver = match receive_event
-            .first()
-            .as_ref()
-            .and_then(|event| event.attributes.get("receiver"))
-        {
-            // Check the receiver address
-            Some(receiver) => Some(
-                Address::decode(receiver)
-                    .or_else(|_| {
-                        // Replace it with MASP address when the receiver is a
-                        // payment address
-                        PaymentAddress::from_str(receiver).map(|_| MASP)
-                    })
-                    .map_err(|_| {
-                        Error::Denom(format!(
-                            "Decoding the receiver address failed: {:?}",
-                            receive_event
+        let maybe_receiver = {
+            // The receiving event should be only one in the single IBC
+            // transaction
+            let maybe_receive_event = self
+                .ctx
+                .inner
+                .borrow()
+                .get_ibc_events(EVENT_TYPE_PACKET)
+                .map_err(|_| {
+                    Error::MintedTokenInfo(
+                        "Reading the IBC event failed".to_string(),
+                    )
+                })?
+                .into_iter()
+                .next();
+            maybe_receive_event
+                .map(|event| {
+                    ibc_events::Receiver::read_opt_from_event_attributes(
+                        &event.attributes,
+                    )
+                    .map_err(|err| {
+                        Error::MintedTokenInfo(format!(
+                            "Could not parse IBC receiver: {err}"
                         ))
-                    })?
-                    .to_string(),
-            ),
-            None => None,
+                    })
+                })
+                .transpose()?
+                .flatten()
         };
-        let denom_event = self
-            .ctx
-            .inner
-            .borrow()
-            .get_ibc_events(EVENT_TYPE_DENOM_TRACE)
-            .map_err(|_| {
-                Error::Denom("Reading the IBC event failed".to_string())
-            })?;
-        // The denom event should be only one in the single IBC transaction
-        Ok(denom_event.first().as_ref().and_then(|event| {
-            let trace_hash = event.attributes.get("trace_hash").cloned()?;
-            let denom = event.attributes.get("denom").cloned()?;
-            Some((trace_hash, denom, receiver?))
+        let maybe_trace_hash_and_denom = {
+            // The denom event should be only one in the single IBC transaction
+            let maybe_denom_event = self
+                .ctx
+                .inner
+                .borrow()
+                .get_ibc_events(EVENT_TYPE_DENOM_TRACE)
+                .map_err(|_| {
+                    Error::MintedTokenInfo(
+                        "Reading the IBC event failed".to_string(),
+                    )
+                })?
+                .into_iter()
+                .next();
+            maybe_denom_event
+                .map(|event| {
+                    let maybe_trace_hash = ibc_events::TraceHash::read_opt_from_event_attributes(
+                        &event.attributes,
+                    )
+                    .map_err(|err| {
+                        Error::MintedTokenInfo(format!(
+                            "Could not parse IBC trace hash: {err}"
+                        ))
+                    })?;
+
+                    let maybe_denom = ibc_events::Denomination::read_opt_from_event_attributes(
+                        &event.attributes,
+                    )
+                    .map_err(|err| {
+                        Error::MintedTokenInfo(format!(
+                            "Could not parse IBC denomination: {err}"
+                        ))
+                    })?;
+
+                    Ok(maybe_trace_hash.zip(maybe_denom))
+                })
+                .transpose()?
+                .flatten()
+        };
+        Ok(maybe_trace_hash_and_denom.and_then(|(trace_hash, denom)| {
+            let receiver_addr =
+                maybe_receiver?.as_ref().transparent_address().to_string();
+            Some((trace_hash, denom, receiver_addr))
         }))
     }
 
