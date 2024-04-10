@@ -11,6 +11,7 @@ use std::str::FromStr;
 use namada_macros::BorshDeserializer;
 #[cfg(feature = "migrations")]
 use namada_migrations::*;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::borsh::{BorshDeserialize, BorshSerialize};
@@ -107,6 +108,8 @@ impl EmitEvents for Vec<Event> {
     BorshSerialize,
     BorshDeserialize,
     BorshDeserializer,
+    Serialize,
+    Deserialize,
 )]
 pub enum EventLevel {
     /// Indicates an event is to do with a finalized block.
@@ -140,6 +143,8 @@ impl Display for EventLevel {
     BorshSerialize,
     BorshDeserialize,
     BorshDeserializer,
+    Serialize,
+    Deserialize,
 )]
 #[repr(transparent)]
 pub struct EventSegment {
@@ -197,6 +202,8 @@ impl Display for EventSegment {
     BorshSerialize,
     BorshDeserialize,
     BorshDeserializer,
+    Serialize,
+    Deserialize,
 )]
 pub struct EventType {
     /// The domain of an [`Event`]. Usually, this is equivalent to the
@@ -270,6 +277,8 @@ impl FromStr for EventType {
     BorshSerialize,
     BorshDeserialize,
     BorshDeserializer,
+    Serialize,
+    Deserialize,
 )]
 pub struct Event {
     /// The level of the event - whether it relates to a block or an individual
