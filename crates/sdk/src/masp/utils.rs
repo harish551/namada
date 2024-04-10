@@ -130,7 +130,7 @@ pub(super) fn extract_payload(
 // Retrieves all the indexes and tx events at the specified height which refer
 // to a valid masp transaction. If an index is given, it filters only the
 // transactions with an index equal or greater to the provided one.
-pub(super) async fn get_indexed_masp_events_at_height<C: Client>(
+pub(super) async fn get_indexed_masp_events_at_height<C: Client + Sync>(
     client: &C,
     height: BlockHeight,
     first_idx_to_query: Option<TxIndex>,
@@ -313,7 +313,10 @@ pub(super) async fn extract_masp_tx<'args, C: Client + Sync>(
 }
 
 // Extract the changed keys and Transaction objects from a masp over ibc message
-pub(super) async fn extract_payload_from_shielded_action<'args, C: Client>(
+pub(super) async fn extract_payload_from_shielded_action<
+    'args,
+    C: Client + Sync,
+>(
     tx_data: &[u8],
     mut args: ExtractShieldedActionArg<'args, C>,
 ) -> Result<(BTreeSet<namada_core::storage::Key>, Transaction), Error> {
@@ -534,12 +537,10 @@ pub(super) struct TaskRunner<U: ShieldedUtils> {
     ctx: Arc<futures_locks::Mutex<ShieldedContext<U>>>,
 }
 
-impl<U: ShieldedUtils> TaskManager<U> {
+impl<U: ShieldedUtils + MaybeSend + MaybeSync> TaskManager<U> {
     /// Create a client proxy and spawn a process to forward
     /// proxy requests.
-    pub(super) fn new(
-        ctx: ShieldedContext<U>,
-    ) -> (TaskRunner<U>, Self) {
+    pub(super) fn new(ctx: ShieldedContext<U>) -> (TaskRunner<U>, Self) {
         let (save_send, save_recv) = tokio::sync::mpsc::channel(100);
         (
             TaskRunner {
@@ -567,8 +568,7 @@ impl<U: ShieldedUtils> TaskManager<U> {
     }
 }
 
-impl<U: ShieldedUtils> TaskRunner<U> {
-
+impl<U: ShieldedUtils + MaybeSync + MaybeSend> TaskRunner<U> {
     pub(super) fn complete(&self) {
         self.action.blocking_send(Action::Complete).unwrap()
     }
@@ -663,14 +663,14 @@ pub trait ProgressLogger<IO: Io> {
 #[derive(Debug, Clone)]
 pub struct DefaultLogger<'io, IO: Io> {
     io: &'io IO,
-    progress: Arc<Mutex<IterProgress>>
+    progress: Arc<Mutex<IterProgress>>,
 }
 
 impl<'io, IO: Io> DefaultLogger<'io, IO> {
     pub fn new(io: &'io IO) -> Self {
         Self {
             io,
-            progress: Arc::new(Mutex::new(Default::default()))
+            progress: Arc::new(Mutex::new(Default::default())),
         }
     }
 }
@@ -683,13 +683,13 @@ struct IterProgress {
 
 struct DefaultFetchIterator<I>
 where
-    I: Iterator<Item=u64>,
+    I: Iterator<Item = u64>,
 {
     inner: I,
-    progress: Arc<Mutex<IterProgress>>
+    progress: Arc<Mutex<IterProgress>>,
 }
 
-impl<I: Iterator<Item=u64>> Iterator for DefaultFetchIterator<I> {
+impl<I: Iterator<Item = u64>> Iterator for DefaultFetchIterator<I> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -701,14 +701,13 @@ impl<I: Iterator<Item=u64>> Iterator for DefaultFetchIterator<I> {
 }
 
 impl<'io, IO: Io> ProgressLogger<IO> for DefaultLogger<'io, IO> {
-
     fn io(&self) -> &IO {
         self.io
     }
 
     fn fetch<I>(&self, items: I) -> impl Iterator<Item = u64>
-        where
-            I: Iterator<Item = u64>,
+    where
+        I: Iterator<Item = u64>,
     {
         {
             let mut locked = self.progress.lock().unwrap();
@@ -721,8 +720,8 @@ impl<'io, IO: Io> ProgressLogger<IO> for DefaultLogger<'io, IO> {
     }
 
     fn scan<I>(&self, items: I) -> impl Iterator<Item = IndexedNoteEntry>
-        where
-            I: IntoIterator<Item = IndexedNoteEntry>,
+    where
+        I: IntoIterator<Item = IndexedNoteEntry>,
     {
         let items: Vec<_> = items.into_iter().collect();
         items.into_iter()
