@@ -1,5 +1,6 @@
 //! Extend [events](Event) with additional fields.
 
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
@@ -25,6 +26,27 @@ pub trait AttributesMap {
 }
 
 impl AttributesMap for HashMap<String, String> {
+    #[inline]
+    fn insert_attribute<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.insert(key.into(), value.into());
+    }
+
+    #[inline]
+    fn retrieve_attribute(&self, key: &str) -> Option<&str> {
+        self.get(key).map(String::as_ref)
+    }
+
+    #[inline]
+    fn is_attribute(&self, key: &str) -> bool {
+        self.contains_key(key)
+    }
+}
+
+impl AttributesMap for BTreeMap<String, String> {
     #[inline]
     fn insert_attribute<K, V>(&mut self, key: K, value: V)
     where
