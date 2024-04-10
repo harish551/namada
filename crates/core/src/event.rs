@@ -278,6 +278,7 @@ impl FromStr for EventType {
     PartialEq,
     Ord,
     PartialOrd,
+    Hash,
     BorshSerialize,
     BorshDeserialize,
     BorshDeserializer,
