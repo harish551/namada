@@ -1,6 +1,6 @@
 //! Extend [events](Event) with additional fields.
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
@@ -539,14 +539,12 @@ where
 
 #[cfg(test)]
 mod event_composition_tests {
-    use std::collections::HashMap;
-
     use super::*;
 
     #[test]
     fn test_event_compose_basic() {
         let expected_attrs = {
-            let mut attrs = HashMap::new();
+            let mut attrs = BTreeMap::new();
             attrs.insert("log".to_string(), "this is sparta!".to_string());
             attrs.insert("height".to_string(), "300".to_string());
             attrs.insert("hash".to_string(), Hash::default().to_string());
@@ -565,7 +563,7 @@ mod event_composition_tests {
     #[test]
     fn test_event_compose_repeated() {
         let expected_attrs = {
-            let mut attrs = HashMap::new();
+            let mut attrs = BTreeMap::new();
             attrs.insert("log".to_string(), "dejavu".to_string());
             attrs
         };
@@ -582,7 +580,7 @@ mod event_composition_tests {
     #[test]
     fn test_event_compose_last_one_kept() {
         let expected_attrs = {
-            let mut attrs = HashMap::new();
+            let mut attrs = BTreeMap::new();
             attrs.insert("log".to_string(), "last".to_string());
             attrs
         };
@@ -630,7 +628,7 @@ mod event_composition_tests {
         }
 
         let attributes = {
-            let mut attrs = HashMap::with_capacity(1);
+            let mut attrs = BTreeMap::new();
             attrs.with_attribute(Info(String::new()));
             attrs
         };

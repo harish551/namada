@@ -1,6 +1,6 @@
 //! Governance utility functions
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use namada_governance::utils::TallyResult as GovTallyResult;
 use namada_sdk::events::extend::{EventAttributeEntry, ExtendAttributesMap};
@@ -278,8 +278,8 @@ fn governance_proposal_attributes(
     id: u64,
     has_proposal_code: bool,
     proposal_code_exit_status: bool,
-) -> HashMap<String, String> {
-    let mut attrs = HashMap::new();
+) -> BTreeMap<String, String> {
+    let mut attrs = BTreeMap::new();
     attrs
         .with_attribute(TallyResult(tally))
         .with_attribute(ProposalId(id))

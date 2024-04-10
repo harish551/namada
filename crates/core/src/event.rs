@@ -3,7 +3,7 @@
 pub mod extend;
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 use std::ops::Deref;
 use std::str::FromStr;
@@ -287,7 +287,7 @@ pub struct Event {
     /// The type of event.
     pub event_type: EventType,
     /// Key-value attributes of the event.
-    pub attributes: HashMap<String, String>,
+    pub attributes: BTreeMap<String, String>,
 }
 
 impl Display for Event {
@@ -329,7 +329,7 @@ impl Event {
         Self {
             event_type: event_type!("tx", "accepted"),
             level: EventLevel::Tx,
-            attributes: HashMap::new(),
+            attributes: BTreeMap::new(),
         }
     }
 
@@ -338,7 +338,7 @@ impl Event {
         Self {
             event_type: event_type!("tx", "applied"),
             level: EventLevel::Tx,
-            attributes: HashMap::new(),
+            attributes: BTreeMap::new(),
         }
     }
 
@@ -393,7 +393,7 @@ impl From<&EthBridgeEvent> for Event {
                     use self::extend::ExtendAttributesMap;
                     use crate::ethereum_structs::BridgePoolTxHash;
 
-                    let mut attributes = HashMap::new();
+                    let mut attributes = BTreeMap::new();
                     attributes.with_attribute(BridgePoolTxHash(tx_hash));
                     attributes
                 },
@@ -407,7 +407,7 @@ impl From<IbcEvent> for Event {
         Self {
             event_type: event_type!("ibc", ibc_event.event_type),
             level: EventLevel::Tx,
-            attributes: ibc_event.attributes,
+            attributes: ibc_event.attributes.into_iter().collect(),
         }
     }
 }

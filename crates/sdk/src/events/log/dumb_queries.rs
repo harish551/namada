@@ -143,7 +143,7 @@ mod tests {
                 event_type: ACCEPTED_TX,
                 level: EventLevel::Block,
                 attributes: {
-                    let mut attrs = std::collections::HashMap::new();
+                    let mut attrs = std::collections::BTreeMap::new();
                     attrs.with_attribute(TxHashAttr(tx_hash));
                     attrs
                 },
@@ -154,7 +154,7 @@ mod tests {
                 event_type: APPLIED_TX,
                 level: EventLevel::Block,
                 attributes: {
-                    let mut attrs = std::collections::HashMap::new();
+                    let mut attrs = std::collections::BTreeMap::new();
                     attrs.with_attribute(TxHashAttr(tx_hash));
                     attrs
                 },

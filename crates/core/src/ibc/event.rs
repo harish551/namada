@@ -89,7 +89,7 @@ impl TryFrom<Event> for IbcEvent {
 
         Ok(Self {
             event_type,
-            attributes: namada_event.attributes,
+            attributes: namada_event.attributes.into_iter().collect(),
         })
     }
 }
